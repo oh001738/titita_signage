@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Bell,
   Music2,
@@ -10,7 +10,7 @@ import {
   WifiOff,
   ArrowUpRight,
 } from "lucide-react";
-import type { DisplayPayload, Lesson } from "@/types";
+import type { DisplayPayload, Lesson, Poster } from "@/types";
 import { defaultContent, mockLessons } from "@/lib/defaults";
 import { isActive, taiwanDate, taiwanTime } from "@/lib/time";
 function lessonStatus(lesson: Lesson, now: Date) {
@@ -25,6 +25,96 @@ function lessonStatus(lesson: Lesson, now: Date) {
   return diff <= 60 * 60_000
     ? { text: "即將開始", style: "soon" }
     : { text: "稍後上課", style: "later" };
+}
+function PosterArtwork({ poster }: { poster: Poster }) {
+  const [shown, setShown] = useState(poster);
+  const [previous, setPrevious] = useState<Poster | null>(null);
+  useEffect(() => {
+    if (poster.id === shown.id && poster.image === shown.image) {
+      if (poster.title !== shown.title || poster.subtitle !== shown.subtitle)
+        setShown(poster);
+      return;
+    }
+    let cancelled = false;
+    const image = new Image();
+    image.onload = () => {
+      if (!cancelled) {
+        setPrevious(shown);
+        setShown(poster);
+      }
+    };
+    image.onerror = () => {
+      /* Keep the last successfully displayed poster. */
+    };
+    image.src = poster.image;
+    return () => {
+      cancelled = true;
+      image.onload = null;
+      image.onerror = null;
+    };
+  }, [poster.id, poster.image, poster.title, poster.subtitle, shown]);
+  useEffect(() => {
+    if (!previous) return;
+    const timer = setTimeout(() => setPrevious(null), 500);
+    return () => clearTimeout(timer);
+  }, [previous]);
+  const layer = (item: Poster, entering: boolean) => (
+    <div
+      className={`poster-layer ${entering ? "poster-layer-enter" : ""}`}
+      key={`${item.id}:${item.image}`}
+    >
+      <img className="poster-image" src={item.image} alt="音樂活動插畫" />
+      <div className="poster-title">
+        <span className="eyebrow">MUSIC BRINGS US TOGETHER</span>
+        <h2>{item.title}</h2>
+        <p>{item.subtitle}</p>
+      </div>
+    </div>
+  );
+  return (
+    <>
+      {previous && layer(previous, false)}
+      {layer(shown, !!previous)}
+    </>
+  );
+}
+
+function AnnouncementText({ body, paused }: { body: string; paused: boolean }) {
+  const container = useRef<HTMLDivElement>(null);
+  const text = useRef<HTMLSpanElement>(null);
+  const [distance, setDistance] = useState(0);
+  useEffect(() => {
+    const measure = () =>
+      setDistance(
+        Math.max(
+          0,
+          (text.current?.scrollWidth ?? 0) -
+            (container.current?.clientWidth ?? 0),
+        ),
+      );
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (container.current) observer.observe(container.current);
+    return () => observer.disconnect();
+  }, [body]);
+  const duration = Math.max(8, distance / 45 + 4);
+  return (
+    <div className="announcement-text" ref={container}>
+      <span
+        ref={text}
+        className={distance > 0 ? "announcement-scroll" : ""}
+        style={
+          {
+            "--scroll-distance": `${distance}px`,
+            "--scroll-duration": `${duration}s`,
+            animationPlayState: paused ? "paused" : "running",
+          } as React.CSSProperties
+        }
+      >
+        {body}
+      </span>
+    </div>
+  );
 }
 export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
   const [payload, setPayload] = useState<DisplayPayload | null>(null);
@@ -165,9 +255,12 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
   const notice = urgent ?? notices[noticeIndex % Math.max(1, notices.length)];
   useEffect(() => {
     if (paused || notices.length < 2) return;
-    const timer = setInterval(() => setNoticeIndex((i) => i + 1), 20_000);
-    return () => clearInterval(timer);
-  }, [paused, notices.length]);
+    const timer = setTimeout(
+      () => setNoticeIndex((i) => i + 1),
+      Math.max(20_000, (notice?.body.length ?? 0) * 800 + 12_000),
+    );
+    return () => clearTimeout(timer);
+  }, [paused, notices.length, notice?.id, notice?.body]);
   useEffect(() => {
     if (mode !== "screen" || !pairRequired) return;
     let cancelled = false;
@@ -284,7 +377,7 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
               <span>教室</span>
               <span>狀態</span>
             </div>
-            <div className="lesson-rows">
+            <div className="lesson-rows" key={page % pages}>
               {lessons
                 .slice((page % pages) * 4, (page % pages) * 4 + 4)
                 .map((lesson) => {
@@ -303,7 +396,10 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
                         <span>{lesson.teacher_name}</span>
                       </div>
                       <div className="lesson-room">{lesson.room_name}</div>
-                      <span className={`lesson-status ${status.style}`}>
+                      <span
+                        key={status.style}
+                        className={`lesson-status status-enter ${status.style}`}
+                      >
                         {status.text}
                       </span>
                     </div>
@@ -354,16 +450,7 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
           >
             {poster ? (
               <>
-                <img
-                  className="poster-image"
-                  src={poster.image}
-                  alt="音樂活動插畫"
-                />
-                <div className="poster-title">
-                  <span className="eyebrow">MUSIC BRINGS US TOGETHER</span>
-                  <h2>{poster.title}</h2>
-                  <p>{poster.subtitle}</p>
-                </div>
+                <PosterArtwork poster={poster} />
                 <div className="poster-dots">
                   {posters.map((p, i) => (
                     <button
@@ -415,7 +502,10 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
           <Bell size={23} />
           {notice?.title || "教室公告"}
         </div>
-        <p>{notice?.body || "歡迎來到音樂的日常。"}</p>
+        <AnnouncementText
+          body={notice?.body || "歡迎來到音樂的日常。"}
+          paused={paused}
+        />
         <span className="footer-brand">
           TITITA
           <br />

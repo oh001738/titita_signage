@@ -1938,3 +1938,74 @@ p {
     animation: none !important;
   }
 }
+
+/* Gentle transitions for the unattended lobby display. */
+.poster-layer {
+  position: absolute;
+  inset: 0;
+}
+.poster-layer-enter {
+  animation: signage-fade-in 0.45s ease-out both;
+}
+.lesson-rows {
+  animation: signage-schedule-in 0.28s ease-out both;
+}
+.status-enter {
+  animation: signage-fade-in 0.35s ease-out both;
+}
+@keyframes signage-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes signage-schedule-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.announcement-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: clamp(12px, 1.4vw, 28px);
+  font-weight: 600;
+  line-height: 1.5;
+}
+.announcement-text span {
+  display: inline-block;
+  white-space: nowrap;
+}
+.announcement-scroll {
+  animation: signage-marquee var(--scroll-duration) ease-in-out infinite
+    alternate;
+}
+@keyframes signage-marquee {
+  0%,
+  12% {
+    transform: translateX(0);
+  }
+  88%,
+  100% {
+    transform: translateX(calc(-1 * var(--scroll-distance)));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .poster-layer-enter,
+  .lesson-rows,
+  .status-enter,
+  .announcement-scroll {
+    animation: none !important;
+  }
+  .announcement-text span {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
