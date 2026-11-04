@@ -885,14 +885,7 @@ export function Admin() {
                     }}
                   />
                 </label>
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={form.hideEnded}
-                    onChange={(e) => update("hideEnded", e.target.checked)}
-                  />
-                  隱藏已結束課程
-                </label>
+                <p>看板顯示進行中與未來一小時的課程，其他時間顯示下一堂課。</p>
                 <div className="tip">
                   <Eye size={18} />
                   <span>

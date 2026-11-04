@@ -13,6 +13,7 @@ import {
 import type { DisplayPayload, Lesson, Poster } from "@/types";
 import { defaultContent, mockLessons } from "@/lib/defaults";
 import { isActive, taiwanDate, taiwanTime } from "@/lib/time";
+import { selectDisplayLessons } from "@/lib/display-schedule";
 function lessonStatus(lesson: Lesson, now: Date) {
   if (lesson.status === "cancelled")
     return { text: "已取消", style: "cancelled" };
@@ -237,11 +238,15 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
       (schedule.source !== "mock" &&
         (!schedule.fetchedAt ||
           now.getTime() - Date.parse(schedule.fetchedAt) > 5 * 60_000)));
-  const lessons = (isExpired ? [] : (schedule?.lessons ?? [])).filter(
-    (l) =>
-      (!content?.roomIds.length || content.roomIds.includes(l.room_id)) &&
-      (!content?.hideEnded || l.end_time > taiwanTime(now)),
+  const eligibleLessons = (isExpired ? [] : (schedule?.lessons ?? [])).filter(
+    (lesson) =>
+      !content?.roomIds.length || content.roomIds.includes(lesson.room_id),
   );
+  const {
+    visible: lessons,
+    next: nextLesson,
+    hasScheduled,
+  } = selectDisplayLessons(eligibleLessons, now);
   const pages = Math.max(1, Math.ceil(lessons.length / 4));
   useEffect(() => {
     if (paused || pages < 2) return;
@@ -411,12 +416,18 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
                   <h2>
                     {isExpired || schedule?.stale
                       ? "課表暫停更新"
-                      : "此刻，留一點時間給音樂"}
+                      : nextLesson
+                        ? "目前一小時內沒有課程"
+                        : hasScheduled
+                          ? "今日課程已結束"
+                          : "今日沒有課程"}
                   </h2>
                   <p>
                     {isExpired || schedule?.stale
                       ? "請洽櫃台確認今日課程"
-                      : "目前沒有符合條件的課程，歡迎洽詢櫃台。"}
+                      : nextLesson
+                        ? `下一堂課：${nextLesson.start_time} ${nextLesson.course_name}・${nextLesson.room_name}`
+                        : "感謝今天一起度過的音樂時光"}
                   </p>
                 </div>
               )}
