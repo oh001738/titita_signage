@@ -1984,17 +1984,14 @@ p {
   white-space: nowrap;
 }
 .announcement-scroll {
-  animation: signage-marquee var(--scroll-duration) ease-in-out infinite
-    alternate;
+  animation: signage-marquee var(--scroll-duration) linear infinite;
 }
 @keyframes signage-marquee {
-  0%,
-  12% {
-    transform: translateX(0);
+  from {
+    transform: translateX(var(--scroll-start));
   }
-  88%,
-  100% {
-    transform: translateX(calc(-1 * var(--scroll-distance)));
+  to {
+    transform: translateX(var(--scroll-end));
   }
 }
 @media (prefers-reduced-motion: reduce) {

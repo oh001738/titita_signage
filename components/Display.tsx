@@ -82,30 +82,30 @@ function PosterArtwork({ poster }: { poster: Poster }) {
 function AnnouncementText({ body, paused }: { body: string; paused: boolean }) {
   const container = useRef<HTMLDivElement>(null);
   const text = useRef<HTMLSpanElement>(null);
-  const [distance, setDistance] = useState(0);
+  const [widths, setWidths] = useState({ text: 0, container: 0 });
   useEffect(() => {
     const measure = () =>
-      setDistance(
-        Math.max(
-          0,
-          (text.current?.scrollWidth ?? 0) -
-            (container.current?.clientWidth ?? 0),
-        ),
-      );
+      setWidths({
+        text: text.current?.scrollWidth ?? 0,
+        container: container.current?.clientWidth ?? 0,
+      });
     measure();
     const observer = new ResizeObserver(measure);
     if (container.current) observer.observe(container.current);
     return () => observer.disconnect();
   }, [body]);
-  const duration = Math.max(8, distance / 45 + 4);
+  const isOverflowing = widths.text > widths.container;
+  const duration = Math.max(8, (widths.text + widths.container) / 45);
   return (
     <div className="announcement-text" ref={container}>
       <span
+        key={body}
         ref={text}
-        className={distance > 0 ? "announcement-scroll" : ""}
+        className={isOverflowing ? "announcement-scroll" : ""}
         style={
           {
-            "--scroll-distance": `${distance}px`,
+            "--scroll-start": `${widths.container}px`,
+            "--scroll-end": `-${widths.text}px`,
             "--scroll-duration": `${duration}s`,
             animationPlayState: paused ? "paused" : "running",
           } as React.CSSProperties
@@ -257,7 +257,7 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     if (paused || notices.length < 2) return;
     const timer = setTimeout(
       () => setNoticeIndex((i) => i + 1),
-      Math.max(20_000, (notice?.body.length ?? 0) * 800 + 12_000),
+      Math.max(20_000, (notice?.body.length ?? 0) * 1500 + 12_000),
     );
     return () => clearTimeout(timer);
   }, [paused, notices.length, notice?.id, notice?.body]);

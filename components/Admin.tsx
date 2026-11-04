@@ -24,6 +24,7 @@ import {
   Link as LinkIcon,
 } from "lucide-react";
 import type { Content, Publication, Screen } from "@/types";
+import { createContentId } from "@/lib/content-id";
 type Section =
   "overview" | "announcements" | "posters" | "settings" | "screens";
 interface EditorState {
@@ -484,7 +485,7 @@ export function Admin() {
                     update("announcements", [
                       ...form.announcements,
                       {
-                        id: crypto.randomUUID(),
+                        id: createContentId(),
                         title: "教室公告",
                         body: "",
                         priority: "normal",
@@ -637,7 +638,7 @@ export function Admin() {
                     update("posters", [
                       ...form.posters,
                       {
-                        id: crypto.randomUUID(),
+                        id: createContentId(),
                         title: "新的音樂活動",
                         subtitle: "",
                         image: "/concert-art.png",
