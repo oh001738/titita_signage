@@ -226,7 +226,9 @@ test("independent CMS: login, draft, publication, pairing, revocation, responsiv
     423,
   );
   await screen.reload();
-  await expect(screen.getByText("螢幕已停用，請由管理員重新啟用")).toBeVisible();
+  await expect(
+    screen.getByText("螢幕已停用，請由管理員重新啟用"),
+  ).toBeVisible();
   expect(await screen.getByLabel("螢幕配對碼").count()).toBe(0);
   expect(
     (
@@ -299,4 +301,52 @@ test("independent CMS: login, draft, publication, pairing, revocation, responsiv
   ).toEqual(["A", "B"]);
   await device.close();
   expect(errors).toEqual([]);
+});
+
+test("screen can pair through another NAS address without weakening admin origin checks", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(60000);
+  const env = await readFile(".env.local", "utf8");
+  const password = env
+    .match(
+      /Initial login password; remove this comment after storing it securely: (.+)/,
+    )?.[1]
+    ?.trim();
+  expect(password).toBeTruthy();
+  await page.goto("/login");
+  await page.getByLabel("密碼", { exact: true }).fill(password!);
+  await page.getByRole("button", { name: "進入管理後台" }).click();
+  await expect(
+    page.getByRole("heading", { name: "今天，也讓美好被看見。" }),
+  ).toBeVisible();
+  const state = (await (await page.request.get("/api/admin/content")).json())
+    .data;
+  const publication = await page.request.post("/api/admin/publish", {
+    headers: { Origin: origin },
+    data: { action: "publish", revision: state.revision },
+  });
+  expect(publication.ok()).toBe(true);
+  const screenContext = await browser.newContext();
+  const screen = await screenContext.newPage();
+  const screenOrigin = origin.replace("127.0.0.1", "localhost");
+  expect(screenOrigin).not.toBe(origin);
+  await screen.goto(screenOrigin + "/display");
+  await expect(screen.getByLabel("螢幕配對碼")).toHaveText(/^\d{6}$/);
+  const code = (await screen.getByLabel("螢幕配對碼").textContent())!.trim();
+  await page.getByRole("button", { name: "螢幕管理", exact: true }).click();
+  await page.getByLabel("螢幕名稱").fill("另一個 NAS 位址");
+  await page.getByLabel("螢幕顯示的配對碼").fill(code);
+  await page.getByRole("button", { name: "配對螢幕", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("配對成功");
+  await expect(screen.getByRole("heading", { name: "今日課程" })).toBeVisible({
+    timeout: 15000,
+  });
+  const crossOrigin = await screenContext.request.post(
+    screenOrigin + "/api/pair",
+    { headers: { Origin: "http://evil.example" } },
+  );
+  expect(crossOrigin.status()).toBe(403);
+  await screenContext.close();
 });

@@ -5,7 +5,7 @@ import {
   hashToken,
   HttpError,
   rateLimit,
-  requireSameOrigin,
+  requireScreenSameOrigin,
 } from "@/lib/auth";
 import { fail, ok } from "@/lib/http";
 import { mutateState } from "@/lib/store";
@@ -14,7 +14,7 @@ import { mutateState } from "@/lib/store";
 // the screen's HttpOnly cookie; only an authenticated admin can approve the code.
 export async function POST(request: Request) {
   try {
-    requireSameOrigin(request);
+    requireScreenSameOrigin(request);
     rateLimit("screen-pair-create", 120);
     const existingToken = (await cookies()).get("signage_screen")?.value;
     const existingHash = existingToken ? hashToken(existingToken) : null;

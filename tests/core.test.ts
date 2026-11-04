@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createSession, verifySession, hashToken } from "../lib/auth";
+import {
+  createSession,
+  verifySession,
+  hashToken,
+  requireSameOrigin,
+  requireScreenSameOrigin,
+} from "../lib/auth";
 import { contentSchema } from "../lib/validation";
 import { defaultContent } from "../lib/defaults";
 import { isActive, taiwanDate, validDate } from "../lib/time";
@@ -52,5 +58,30 @@ describe("Taiwan scheduling", () => {
     expect(isActive(item, new Date("2026-11-04T01:00:00Z"))).toBe(true);
     expect(isActive(item, new Date("2026-11-04T02:00:00Z"))).toBe(false);
     expect(validDate("2026-02-30")).toBe(false);
+  });
+});
+
+describe("screen pairing origin", () => {
+  it("allows a screen using the NAS IP while retaining strict admin origin checks", () => {
+    vi.stubEnv("APP_ORIGIN", "http://tititamusic:3002");
+    const make = (origin: string, host = "192.168.31.100:3002") =>
+      new Request("http://localhost:3002/api/pair", {
+        method: "POST",
+        headers: { origin, host },
+      });
+    const screen = make("http://192.168.31.100:3002");
+    expect(() => requireScreenSameOrigin(screen)).not.toThrow();
+    expect(() => requireSameOrigin(screen)).toThrow("無效的請求來源");
+    expect(() => requireScreenSameOrigin(make("http://evil.example"))).toThrow(
+      "無效的請求來源",
+    );
+    expect(() =>
+      requireScreenSameOrigin(make("https://192.168.31.100:3002")),
+    ).toThrow("無效的請求來源");
+    expect(() =>
+      requireScreenSameOrigin(
+        new Request("http://localhost:3002/api/pair", { method: "POST" }),
+      ),
+    ).toThrow("無效的請求來源");
   });
 });

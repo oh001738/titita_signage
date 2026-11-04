@@ -91,6 +91,26 @@ export function requireSameOrigin(request: Request) {
   }
   if (!valid) throw new HttpError(403, "無效的請求來源");
 }
+/** Pairing may be initiated from a different LAN hostname/IP than the admin
+ * URL. It must still originate from the exact host and scheme being requested.
+ * Admin mutations continue to use the stricter APP_ORIGIN check above. */
+export function requireScreenSameOrigin(request: Request) {
+  const origin = request.headers.get("origin");
+  try {
+    const parsed = new URL(origin ?? "");
+    const requestUrl = new URL(request.url);
+    if (
+      origin === parsed.origin &&
+      ["http:", "https:"].includes(parsed.protocol) &&
+      parsed.protocol === requestUrl.protocol &&
+      parsed.host === request.headers.get("host")
+    )
+      return;
+  } catch {
+    /* Missing or malformed origins are rejected. */
+  }
+  throw new HttpError(403, "無效的請求來源");
+}
 const globalRate = globalThis as typeof globalThis & {
   signageRates?: Map<string, { count: number; reset: number }>;
 };
