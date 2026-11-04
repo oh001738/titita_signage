@@ -9,6 +9,7 @@ export function defaultContent(): Content {
     roomIds: [],
     hideEnded: false,
     theme: "cream",
+    awards: [],
     announcements: [
       {
         id: "welcome",

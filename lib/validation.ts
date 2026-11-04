@@ -36,6 +36,51 @@ export const contentSchema = z
           .refine(validWindow, "下架時間必須晚於上架時間"),
       )
       .max(30),
+    awards: z
+      .array(
+        z
+          .object({
+            id: text(80).min(1),
+            layout: z.enum(["individual", "group", "competition"]),
+            competition: text(80).min(1),
+            sharedPrize: text(80),
+            image: z.union([z.literal(""), localImage]),
+            enabled: z.boolean(),
+            duration: z.number().int().min(10).max(60),
+            ...windowFields,
+            recipients: z
+              .array(
+                z.object({
+                  id: text(80).min(1),
+                  name: text(30).min(1),
+                  category: text(50),
+                  prize: text(80),
+                }),
+              )
+              .min(1)
+              .max(60),
+          })
+          .refine(validWindow, "下架時間必須晚於上架時間")
+          .refine(
+            (a) => a.layout !== "individual" || a.recipients.length === 1,
+            "個人獲獎請填寫一位學生",
+          )
+          .refine(
+            (a) =>
+              a.layout === "competition"
+                ? a.recipients.every((r) => r.prize.length > 0)
+                : a.sharedPrize.length > 0,
+            "請填寫獎項",
+          )
+          .refine(
+            (a) =>
+              new Set(a.recipients.map((r) => r.id)).size ===
+              a.recipients.length,
+            "學生 ID 重複",
+          ),
+      )
+      .max(30)
+      .default([]),
     posters: z
       .array(
         z
@@ -55,7 +100,8 @@ export const contentSchema = z
     (v) =>
       new Set(v.announcements.map((a) => a.id)).size ===
         v.announcements.length &&
-      new Set(v.posters.map((p) => p.id)).size === v.posters.length,
+      new Set(v.posters.map((p) => p.id)).size === v.posters.length &&
+      new Set(v.awards.map((a) => a.id)).size === v.awards.length,
     "內容 ID 重複",
   );
 export const lessonSchema = z.object({

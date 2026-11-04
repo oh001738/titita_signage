@@ -14,6 +14,8 @@ import type { DisplayPayload, Lesson, Poster } from "@/types";
 import { defaultContent, mockLessons } from "@/lib/defaults";
 import { isActive, taiwanDate, taiwanTime } from "@/lib/time";
 import { selectDisplayLessons } from "@/lib/display-schedule";
+import { awardPages } from "@/lib/award-pages";
+import { AwardDisplay } from "@/components/AwardDisplay";
 function lessonStatus(lesson: Lesson, now: Date) {
   if (lesson.status === "cancelled")
     return { text: "已取消", style: "cancelled" };
@@ -128,6 +130,8 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
   const [posterIndex, setPosterIndex] = useState(0);
   const [page, setPage] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [showAward, setShowAward] = useState(false);
+  const [awardCursor, setAwardCursor] = useState(0);
   useEffect(() => {
     if (mode === "demo") {
       const date = taiwanDate();
@@ -230,6 +234,25 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     );
     return () => clearTimeout(timer);
   }, [posterIndex, poster?.duration, paused, posters.length]);
+  const activeAwardPages = awardPages(content?.awards ?? [], now);
+  const currentAwardPage =
+    activeAwardPages[awardCursor % Math.max(1, activeAwardPages.length)];
+  const activeAwardsKey = activeAwardPages
+    .map((item) => `${item.award.id}:${item.page}`)
+    .join(",");
+  useEffect(() => {
+    if (paused || !activeAwardsKey) return;
+    const timer = setTimeout(
+      () => {
+        if (showAward) {
+          setShowAward(false);
+          setAwardCursor((value) => value + 1);
+        } else setShowAward(true);
+      },
+      showAward ? (currentAwardPage?.award.duration ?? 15) * 1000 : 40_000,
+    );
+    return () => clearTimeout(timer);
+  }, [paused, showAward, activeAwardsKey, currentAwardPage?.award.duration]);
   const today = taiwanDate(now);
   const schedule = payload?.schedule;
   const isExpired =
@@ -523,6 +546,12 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
           <small>MUSIC & EVERYDAY</small>
         </span>
       </footer>
+      {showAward && currentAwardPage && (
+        <AwardDisplay
+          {...currentAwardPage}
+          schoolName={content?.schoolName ?? "梯梯塔音樂坊"}
+        />
+      )}
       <div className="display-controls">
         <button
           aria-label={paused ? "繼續輪播" : "暫停輪播"}

@@ -15,6 +15,24 @@ export interface Poster {
   startsAt: string;
   endsAt: string;
 }
+export interface AwardRecipient {
+  id: string;
+  name: string;
+  category: string;
+  prize: string;
+}
+export interface Award {
+  id: string;
+  layout: "individual" | "group" | "competition";
+  competition: string;
+  sharedPrize: string;
+  image: string;
+  enabled: boolean;
+  duration: number;
+  startsAt: string;
+  endsAt: string;
+  recipients: AwardRecipient[];
+}
 export interface Content {
   schoolName: string;
   welcome: string;
@@ -26,6 +44,7 @@ export interface Content {
   theme: "cream" | "mint";
   announcements: Announcement[];
   posters: Poster[];
+  awards?: Award[];
 }
 export interface Publication {
   version: number;

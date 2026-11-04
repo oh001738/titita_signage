@@ -25,8 +25,9 @@ import {
 } from "lucide-react";
 import type { Content, Publication, Screen } from "@/types";
 import { createContentId } from "@/lib/content-id";
+import { AwardsEditor } from "@/components/AwardsEditor";
 type Section =
-  "overview" | "announcements" | "posters" | "settings" | "screens";
+  "overview" | "announcements" | "posters" | "awards" | "settings" | "screens";
 interface EditorState {
   revision: number;
   draft: Content;
@@ -37,6 +38,7 @@ const navigation = [
   { id: "overview", label: "總覽", icon: LayoutDashboard },
   { id: "announcements", label: "公告管理", icon: Bell },
   { id: "posters", label: "海報輪播", icon: Images },
+  { id: "awards", label: "榮耀時刻", icon: Music2 },
   { id: "settings", label: "畫面與課表", icon: Settings2 },
   { id: "screens", label: "螢幕管理", icon: Monitor },
 ] as const;
@@ -799,6 +801,20 @@ export function Admin() {
                 </article>
               ))}
             </section>
+          )}
+          {section === "awards" && (
+            <AwardsEditor
+              awards={form.awards ?? []}
+              onChange={(fn) => {
+                setForm((current) =>
+                  current
+                    ? { ...current, awards: fn(current.awards ?? []) }
+                    : current,
+                );
+                setIsDirty(true);
+                setMessage("");
+              }}
+            />
           )}
           {section === "settings" && (
             <div className="settings-grid">
