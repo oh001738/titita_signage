@@ -1,0 +1,23 @@
+services:
+  signage:
+    build: .
+    container_name: titita-signage
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    env_file:
+      - .env.local
+    environment:
+      MOCK_MODE: "false"
+      CMS_STORAGE: mongo
+      DATA_DIR: /app/data
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+    volumes:
+      - signage-data:/app/data
+    networks:
+      - titita_onecloud
+volumes:
+  signage-data:
+networks:
+  titita_onecloud:
+    external: true

@@ -1,0 +1,184 @@
+diff --git a/lib/signage.ts b/lib/signage.ts
+new file mode 100644
+--- /dev/null
++++ b/lib/signage.ts
+@@ -0,0 +1,48 @@
++import { createHash, timingSafeEqual } from 'node:crypto'
++
++/** Separate capability from LINE OA: this key grants access only to the signage endpoint. */
++export function checkSignageAuth(request: Request): Response | null {
++  const expected = process.env.SIGNAGE_API_KEY
++  if (!expected || expected.length < 32)
++    return Response.json({ data: null, error: 'Signage API is not configured' }, { status: 503 })
++  const provided = request.headers.get('x-internal-key') ?? ''
++  const digest = (value: string) => createHash('sha256').update(value).digest()
++  if (!provided || !timingSafeEqual(digest(provided), digest(expected)))
++    return Response.json({ data: null, error: 'Forbidden' }, { status: 403 })
++  return null
++}
++
++export function isSignageDate(value: string): boolean {
++  return /^\d{4}-\d{2}-\d{2}$/.test(value)
++    && !Number.isNaN(Date.parse(`${value}T00:00:00Z`))
++    && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value
++}
++
++export interface SignageLessonInput {
++  _id: { toString(): string }
++  date: string
++  start_time: string
++  end_time: string
++  room_id: string
++  status: string
++}
++
++/** Explicit allowlist: never serialize a Lesson/Course document into a public screen payload. */
++export function toSignageLesson(
++  lesson: SignageLessonInput,
++  course: { course_name: string; class_type: string },
++  teacherName: string,
++  roomName: string,
++) {
++  return {
++    id: lesson._id.toString(),
++    date: lesson.date,
++    start_time: lesson.start_time,
++    end_time: lesson.end_time,
++    course_name: course.course_name,
++    teacher_name: teacherName,
++    room_id: lesson.room_id,
++    room_name: roomName,
++    status: lesson.status,
++  }
++}
+diff --git a/app/api/internal/signage/schedule/route.ts b/app/api/internal/signage/schedule/route.ts
+new file mode 100644
+--- /dev/null
++++ b/app/api/internal/signage/schedule/route.ts
+@@ -0,0 +1,48 @@
++import { connectDB } from '@/lib/db/mongoose'
++import Lesson from '@/lib/models/Lesson'
++import Course from '@/lib/models/Course'
++import Teacher from '@/lib/models/Teacher'
++import Room from '@/lib/models/Room'
++import { checkSignageAuth, isSignageDate, toSignageLesson } from '@/lib/signage'
++import { getTaiwanTodayStr } from '@/lib/utils'
++
++export const dynamic = 'force-dynamic'
++
++/** Service authentication replaces user sessions, matching the existing LINE OA Internal API boundary. */
++export async function GET(request: Request) {
++  const authError = checkSignageAuth(request)
++  if (authError) return authError
++
++  const date = new URL(request.url).searchParams.get('date') ?? getTaiwanTodayStr()
++  if (!isSignageDate(date))
++    return Response.json({ data: null, error: 'Invalid date' }, { status: 400 })
++  if (Math.abs(Date.parse(`${date}T00:00:00Z`) - Date.parse(`${getTaiwanTodayStr()}T00:00:00Z`)) > 7 * 86400000)
++    return Response.json({ data: null, error: 'Date must be within seven days of today' }, { status: 400 })
++
++  try {
++    await connectDB()
++    // Read existing Lesson instances; never expand, mutate, or reconstruct weekly schedules here.
++    const lessons = await Lesson.find({ date }, {
++      _id: 1, course_id: 1, teacher_id: 1, room_id: 1,
++      date: 1, start_time: 1, end_time: 1, status: 1,
++    }).sort({ start_time: 1, room_id: 1 }).limit(1001).lean()
++    if (lessons.length > 1000)
++      return Response.json({ data: null, error: 'Schedule exceeds display limit' }, { status: 503 })
++    const [courses, teachers, rooms] = await Promise.all([
++      Course.find({ _id: { $in: Array.from(new Set(lessons.map(l => l.course_id))) } }, { course_name: 1, class_type: 1 }).lean(),
++      Teacher.find({ _id: { $in: Array.from(new Set(lessons.map(l => l.teacher_id))) } }, { teacher_name: 1 }).lean(),
++      Room.find({ _id: { $in: Array.from(new Set(lessons.map(l => l.room_id).filter(Boolean))) } }, { room_name: 1 }).lean(),
++    ])
++    const courseMap = new Map(courses.map(c => [c._id.toString(), c]))
++    const teacherMap = new Map(teachers.map(t => [t._id.toString(), t.teacher_name]))
++    const roomMap = new Map(rooms.map(r => [r._id.toString(), r.room_name]))
++    const data = lessons.flatMap(lesson => {
++      const course = courseMap.get(lesson.course_id)
++      if (!course) return []
++      return [toSignageLesson(lesson, course, teacherMap.get(lesson.teacher_id) ?? '授課老師', roomMap.get(lesson.room_id) ?? '請洽櫃台')]
++    })
++    return Response.json({ data: { date, lessons: data }, error: null }, { headers: { 'Cache-Control': 'no-store' } })
++  } catch {
++    return Response.json({ data: null, error: 'Server Error' }, { status: 500 })
++  }
++}
+diff --git a/lib/__tests__/signage.test.ts b/lib/__tests__/signage.test.ts
+new file mode 100644
+--- /dev/null
++++ b/lib/__tests__/signage.test.ts
+@@ -0,0 +1,29 @@
++import { afterEach, describe, expect, it } from 'vitest'
++import { checkSignageAuth, isSignageDate, toSignageLesson } from '../signage'
++
++const original = process.env.SIGNAGE_API_KEY
++afterEach(() => { if (original === undefined) delete process.env.SIGNAGE_API_KEY; else process.env.SIGNAGE_API_KEY = original })
++
++describe('signage service boundary', () => {
++  it('fails closed when disabled, absent, or a LINE OA key is supplied', () => {
++    delete process.env.SIGNAGE_API_KEY
++    expect(checkSignageAuth(new Request('http://localhost'))?.status).toBe(503)
++    process.env.SIGNAGE_API_KEY = 's'.repeat(32)
++    expect(checkSignageAuth(new Request('http://localhost'))?.status).toBe(403)
++    expect(checkSignageAuth(new Request('http://localhost', { headers: { 'x-internal-key': 'line-key' } }))?.status).toBe(403)
++    expect(checkSignageAuth(new Request('http://localhost', { headers: { 'x-internal-key': 's'.repeat(32) } }))).toBeNull()
++  })
++  it('rejects invalid dates including normalization of February 30', () => {
++    expect(isSignageDate('2026-02-30')).toBe(false)
++    expect(isSignageDate('2026-11-04')).toBe(true)
++    expect(isSignageDate('2026-11-04T00:00:00Z')).toBe(false)
++  })
++  it('preserves individual course titles while excluding private lesson fields', () => {
++    const lesson = { _id: 'lesson-1', date: '2026-11-04', start_time: '16:00', end_time: '17:00', room_id: 'A', status: 'cancelled', student_id: 'private-id', notes: 'private-note', absent_student_ids: ['private-id'] }
++    const result = toSignageLesson(lesson, { course_name: '王小明鋼琴', class_type: 'individual' }, '林老師', 'A 教室')
++    expect(Object.keys(result).sort()).toEqual(['id', 'date', 'start_time', 'end_time', 'course_name', 'teacher_name', 'room_id', 'room_name', 'status'].sort())
++    expect(result.course_name).toBe('王小明鋼琴')
++    expect(JSON.stringify(result)).not.toMatch(/private/)
++    expect(result.status).toBe('cancelled')
++  })
++})
+diff --git a/lib/__tests__/signage-route.test.ts b/lib/__tests__/signage-route.test.ts
+new file mode 100644
+--- /dev/null
++++ b/lib/__tests__/signage-route.test.ts
+@@ -0,0 +1,39 @@
++import { afterEach, describe, expect, it, vi } from 'vitest'
++
++const mocks = vi.hoisted(() => ({
++  connect: vi.fn(),
++  lesson: vi.fn(), course: vi.fn(), teacher: vi.fn(), room: vi.fn(),
++}))
++vi.mock('@/lib/db/mongoose', () => ({ connectDB: mocks.connect }))
++vi.mock('@/lib/models/Lesson', () => ({ default: { find: mocks.lesson } }))
++vi.mock('@/lib/models/Course', () => ({ default: { find: mocks.course } }))
++vi.mock('@/lib/models/Teacher', () => ({ default: { find: mocks.teacher } }))
++vi.mock('@/lib/models/Room', () => ({ default: { find: mocks.room } }))
++vi.mock('@/lib/utils', () => ({ getTaiwanTodayStr: () => '2026-11-04' }))
++import { GET } from '@/app/api/internal/signage/schedule/route'
++
++afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks() })
++const request = (date: string, key = 's'.repeat(32)) => new Request(`http://localhost/api/internal/signage/schedule?date=${date}`, { headers: { 'x-internal-key': key } })
++
++describe('signage schedule route', () => {
++  it('denies unauthorized and invalid requests before querying the database', async () => {
++    vi.stubEnv('SIGNAGE_API_KEY', 's'.repeat(32))
++    expect((await GET(request('2026-11-04', 'wrong'))).status).toBe(403)
++    expect((await GET(request('2026-02-30'))).status).toBe(400)
++    expect((await GET(request('2026-12-04'))).status).toBe(400)
++    expect(mocks.connect).not.toHaveBeenCalled()
++  })
++  it('joins the actual lesson room and teacher, preserves cancellations, and excludes private fields', async () => {
++    vi.stubEnv('SIGNAGE_API_KEY', 's'.repeat(32))
++    mocks.lesson.mockReturnValue({ sort: () => ({ limit: () => ({ lean: async () => [{ _id: 'lesson', course_id: 'course', teacher_id: 'substitute', room_id: 'new-room', date: '2026-11-04', start_time: '16:00', end_time: '17:00', status: 'cancelled', notes: 'private' }] }) }) })
++    mocks.course.mockReturnValue({ lean: async () => [{ _id: 'course', course_name: '學生姓名個別課', class_type: 'individual' }] })
++    mocks.teacher.mockReturnValue({ lean: async () => [{ _id: 'substitute', teacher_name: '代課老師' }] })
++    mocks.room.mockReturnValue({ lean: async () => [{ _id: 'new-room', room_name: '新教室' }] })
++    const response = await GET(request('2026-11-04'))
++    expect(response.status).toBe(200)
++    const result = await response.json()
++    expect(result.data.lessons[0]).toMatchObject({ teacher_name: '代課老師', room_name: '新教室', status: 'cancelled', course_name: '學生姓名個別課' })
++    expect(JSON.stringify(result)).not.toMatch(/private/)
++    expect(mocks.connect).toHaveBeenCalledOnce()
++  })
++})
