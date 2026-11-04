@@ -6,15 +6,20 @@ export function AwardDisplay({
   page,
   count,
   schoolName,
+  fading,
 }: {
   award: Award;
   recipients: Award["recipients"];
   page: number;
   count: number;
   schoolName: string;
+  fading: boolean;
 }) {
   return (
-    <section className="award-display" aria-label="榮耀時刻">
+    <section
+      className={`award-display ${fading ? "award-display-exit" : ""}`}
+      aria-label="榮耀時刻"
+    >
       <div className="award-display-header">
         <span>
           <Music2 size={27} /> {schoolName}

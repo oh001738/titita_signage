@@ -2170,3 +2170,42 @@ p {
 .display-controls {
   z-index: 21;
 }
+
+.award-display-exit {
+  animation: award-fade-out 0.5s ease both;
+}
+@keyframes award-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .award-display-exit {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* Keep the same announcement element visible throughout award transitions. */
+.signage > .announcement-bar {
+  position: relative;
+  z-index: 21;
+}
+.award-display {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: calc(12.1vh + 12px);
+}
+.award-display-main {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+@media (max-width: 800px) {
+  .award-display {
+    padding-bottom: calc(2.1vh + max(10vh, 100px) + 12px);
+  }
+}

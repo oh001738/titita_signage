@@ -131,6 +131,7 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
   const [page, setPage] = useState(0);
   const [paused, setPaused] = useState(false);
   const [showAward, setShowAward] = useState(false);
+  const [awardFading, setAwardFading] = useState(false);
   const [awardCursor, setAwardCursor] = useState(0);
   useEffect(() => {
     if (mode === "demo") {
@@ -241,18 +242,32 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     .map((item) => `${item.award.id}:${item.page}`)
     .join(",");
   useEffect(() => {
-    if (paused || !activeAwardsKey) return;
+    if (paused || !activeAwardsKey || awardFading) return;
     const timer = setTimeout(
       () => {
         if (showAward) {
-          setShowAward(false);
-          setAwardCursor((value) => value + 1);
+          setAwardFading(true);
         } else setShowAward(true);
       },
       showAward ? (currentAwardPage?.award.duration ?? 15) * 1000 : 40_000,
     );
     return () => clearTimeout(timer);
-  }, [paused, showAward, activeAwardsKey, currentAwardPage?.award.duration]);
+  }, [
+    paused,
+    showAward,
+    awardFading,
+    activeAwardsKey,
+    currentAwardPage?.award.duration,
+  ]);
+  useEffect(() => {
+    if (!awardFading) return;
+    const timer = setTimeout(() => {
+      setShowAward(false);
+      setAwardFading(false);
+      setAwardCursor((value) => value + 1);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [awardFading]);
   const today = taiwanDate(now);
   const schedule = payload?.schedule;
   const isExpired =
@@ -549,6 +564,7 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
       {showAward && currentAwardPage && (
         <AwardDisplay
           {...currentAwardPage}
+          fading={awardFading}
           schoolName={content?.schoolName ?? "梯梯塔音樂坊"}
         />
       )}
