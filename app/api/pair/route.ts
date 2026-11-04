@@ -1,6 +1,5 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { cookies } from "next/headers";
-import { z } from "zod";
 import {
   cookieOptions,
   hashToken,
@@ -8,32 +7,51 @@ import {
   rateLimit,
   requireSameOrigin,
 } from "@/lib/auth";
-import { fail, jsonBody, ok } from "@/lib/http";
+import { fail, ok } from "@/lib/http";
 import { mutateState } from "@/lib/store";
+
+// A screen creates its own short-lived code. Its long random token never leaves
+// the screen's HttpOnly cookie; only an authenticated admin can approve the code.
 export async function POST(request: Request) {
   try {
     requireSameOrigin(request);
-    rateLimit("screen-pair", 20);
-    const { code } = z
-      .object({ code: z.string().regex(/^\d{6}$/) })
-      .parse(await jsonBody(request));
+    rateLimit("screen-pair-create", 120);
+    const existingToken = (await cookies()).get("signage_screen")?.value;
+    const existingHash = existingToken ? hashToken(existingToken) : null;
     const token = randomBytes(32).toString("base64url");
-    await mutateState((s) => {
-      const pair = s.pairCodes.find(
+    const expiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
+    const code = await mutateState((s) => {
+      if (
+        existingHash &&
+        s.screens.some(
+          (screen) => screen.enabled && screen.tokenHash === existingHash,
+        )
+      )
+        throw new HttpError(409, "螢幕已配對，請重新載入");
+      s.pendingPairings = (s.pendingPairings ?? []).filter(
         (p) =>
-          p.hash === hashToken(code) && Date.parse(p.expiresAt) > Date.now(),
+          Date.parse(p.expiresAt) > Date.now() && p.tokenHash !== existingHash,
       );
-      const screen =
-        pair && s.screens.find((d) => d.id === pair.screenId && d.enabled);
-      if (!screen) throw new HttpError(403, "配對碼無效或已過期");
-      screen.tokenHash = hashToken(token);
-      s.pairCodes = s.pairCodes.filter((p) => p.screenId !== screen.id);
+      if (s.pendingPairings.length >= 100)
+        throw new HttpError(429, "待配對的螢幕過多，請稍後再試");
+      let candidate: string;
+      do {
+        candidate = String(randomInt(100000, 1000000));
+      } while (
+        s.pendingPairings.some((p) => p.codeHash === hashToken(candidate))
+      );
+      s.pendingPairings.push({
+        codeHash: hashToken(candidate),
+        tokenHash: hashToken(token),
+        expiresAt,
+      });
+      return candidate;
     });
     (await cookies()).set("signage_screen", token, {
       ...cookieOptions(),
       maxAge: 365 * 24 * 60 * 60,
     });
-    return ok({ success: true });
+    return ok({ code, expiresAt }, 201);
   } catch (e) {
     return fail(e);
   }

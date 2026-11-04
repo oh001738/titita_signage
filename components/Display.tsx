@@ -32,8 +32,7 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState("");
   const [pairRequired, setPairRequired] = useState(false);
-  const [code, setCode] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [pairCode, setPairCode] = useState("");
   const [noticeIndex, setNoticeIndex] = useState(0);
   const [posterIndex, setPosterIndex] = useState(0);
   const [page, setPage] = useState(0);
@@ -68,10 +67,20 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
         const body = await response.json();
         if (!response.ok) {
           if (disposed) return;
+          if (mode === "screen" && response.status === 423) {
+            setPayload(null);
+            localStorage.removeItem("signage-display-cache");
+            setPairRequired(false);
+            throw new Error(body.error || "螢幕已停用");
+          }
           if ([401, 403].includes(response.status)) {
             setPayload(null);
             localStorage.removeItem("signage-display-cache");
-            setPairRequired(mode === "screen");
+            if (mode === "screen") {
+              setPairRequired(true);
+              setError("");
+              return;
+            }
           }
           throw new Error(body.error || "無法取得看板內容");
         }
@@ -159,53 +168,70 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     const timer = setInterval(() => setNoticeIndex((i) => i + 1), 20_000);
     return () => clearInterval(timer);
   }, [paused, notices.length]);
-  async function pair(e: React.FormEvent) {
-    e.preventDefault();
-    setIsLoading(true);
-    setError("");
-    try {
-      const response = await fetch("/api/pair", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
-      });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error);
-      window.location.reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "配對失敗");
-    } finally {
-      setIsLoading(false);
+  useEffect(() => {
+    if (mode !== "screen" || !pairRequired) return;
+    let cancelled = false;
+    let refresh: ReturnType<typeof setTimeout>;
+    async function createPairing() {
+      try {
+        const response = await fetch("/api/pair", { method: "POST" });
+        const body = await response.json();
+        if (response.status === 409) {
+          window.location.reload();
+          return;
+        }
+        if (!response.ok) throw new Error(body.error || "無法產生配對碼");
+        if (cancelled) return;
+        setPairCode(body.data.code);
+        setError("");
+        refresh = setTimeout(
+          createPairing,
+          Math.max(1000, Date.parse(body.data.expiresAt) - Date.now()),
+        );
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "無法產生配對碼");
+          refresh = setTimeout(createPairing, 30_000);
+        }
+      }
     }
-  }
+    void createPairing();
+    const poll = setInterval(async () => {
+      try {
+        const response = await fetch("/api/display", { cache: "no-store" });
+        if (
+          response.ok ||
+          (response.status === 404 &&
+            (await response.json()).error === "尚未發布內容，請至管理後台發布")
+        )
+          window.location.reload();
+      } catch {
+        /* Retry when the network returns. */
+      }
+    }, 3_000);
+    return () => {
+      cancelled = true;
+      clearTimeout(refresh);
+      clearInterval(poll);
+    };
+  }, [mode, pairRequired]);
   if (!payload)
     return (
       <main className="pair-page">
         <div className="pair-card">
           <Music2 size={42} />
           <p className="eyebrow">TITITA SIGNAGE</p>
-          <h1>
-            {pairRequired ? "讓美好的日常，開始播放" : "正在準備音樂日常"}
-          </h1>
-          <p>請至獨立 CMS 的「螢幕管理」取得配對碼。</p>
-          {mode === "screen" && (
-            <form onSubmit={pair}>
-              <label htmlFor="pair-code">六位數配對碼</label>
-              <input
-                id="pair-code"
-                autoComplete="one-time-code"
-                inputMode="numeric"
-                pattern="[0-9]{6}"
-                maxLength={6}
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                required
-              />
-              <button className="primary" disabled={isLoading}>
-                {" "}
-                {isLoading ? "配對中…" : "配對這台螢幕"}
-              </button>
-            </form>
+          <h1>{pairRequired ? "請在後台配對這台螢幕" : "正在準備音樂日常"}</h1>
+          {pairRequired && (
+            <>
+              <p>請在 CMS 後台「螢幕管理」輸入以下配對碼：</p>
+              <div className="pair-code">
+                <span>螢幕配對碼</span>
+                <strong aria-label="螢幕配對碼">{pairCode || "產生中…"}</strong>
+                <small>有效 10 分鐘，到期自動更新</small>
+              </div>
+              <p>配對完成後，畫面會自動開始播放。</p>
+            </>
           )}
           {error && (
             <p className="error" role="alert">

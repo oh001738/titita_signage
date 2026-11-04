@@ -93,10 +93,7 @@ export function Admin() {
   const [form, setForm] = useState<Content | null>(null);
   const [screens, setScreens] = useState<Screen[]>([]);
   const [name, setName] = useState("大廳電視");
-  const [pairCode, setPairCode] = useState<{
-    code: string;
-    expiresAt: string;
-  } | null>(null);
+  const [pairCode, setPairCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -910,22 +907,24 @@ export function Admin() {
               <section className="admin-card editor-card">
                 <h2>連接一台螢幕</h2>
                 <p className="muted">
-                  建立配對碼後，在電視瀏覽器開啟{" "}
+                  在電視瀏覽器開啟{" "}
                   <a href="/display" target="_blank" rel="noreferrer">
                     /display
                   </a>
-                  ，輸入配對碼。
+                  ，再將螢幕顯示的六位配對碼輸入這裡。配對碼有效 10
+                  分鐘，到期會自動更新。
                 </p>
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     void run(async () => {
-                      const code = await api<{
-                        code: string;
-                        expiresAt: string;
-                      }>("/api/admin/screens", "POST", { name });
-                      setPairCode(code);
+                      await api("/api/admin/screens", "POST", {
+                        name,
+                        code: pairCode,
+                      });
+                      setPairCode("");
                       await loadScreens();
+                      setMessage("配對成功，螢幕即將自動開始播放");
                     });
                   }}
                 >
@@ -938,25 +937,22 @@ export function Admin() {
                       required
                     />
                   </label>
+                  <label>
+                    螢幕顯示的配對碼
+                    <input
+                      value={pairCode}
+                      onChange={(e) => setPairCode(e.target.value)}
+                      inputMode="numeric"
+                      pattern="[0-9]{6}"
+                      maxLength={6}
+                      required
+                    />
+                  </label>
                   <button className="primary" disabled={isLoading}>
                     <Plus size={16} />
-                    產生配對碼
+                    配對螢幕
                   </button>
                 </form>
-                {pairCode && (
-                  <div className="pair-code">
-                    <span>一次性配對碼</span>
-                    <strong>{pairCode.code}</strong>
-                    <small>
-                      有效至{" "}
-                      {new Date(pairCode.expiresAt).toLocaleTimeString(
-                        "zh-TW",
-                        { timeZone: "Asia/Taipei" },
-                      )}
-                      （台灣時間）
-                    </small>
-                  </div>
-                )}
               </section>
               <section className="admin-card editor-card">
                 <div className="card-heading">
@@ -1007,6 +1003,29 @@ export function Admin() {
                       }
                     >
                       {screen.enabled ? "停用" : "啟用"}
+                    </button>
+                    <button
+                      className="secondary"
+                      disabled={isLoading}
+                      aria-label={`刪除 ${screen.name}`}
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            `確定刪除「${screen.name}」？此螢幕需重新配對才能播放。`,
+                          )
+                        )
+                          return;
+                        void run(async () => {
+                          await api("/api/admin/screens", "DELETE", {
+                            id: screen.id,
+                          });
+                          await loadScreens();
+                          setMessage("已刪除螢幕");
+                        });
+                      }}
+                    >
+                      <Trash2 size={16} />
+                      刪除
                     </button>
                   </div>
                 ))}

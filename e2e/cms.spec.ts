@@ -1,21 +1,31 @@
 import { test, expect } from "@playwright/test";
 import { readFile, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
-const origin = "http://127.0.0.1:3002";
+const origin = process.env.E2E_BASE_URL || "http://127.0.0.1:3002";
 let originalState: string | null = null;
 test.beforeEach(async () => {
   const env = await readFile(".env.local", "utf8");
   if (!env.includes("CMS_STORAGE=file") || !env.includes("MOCK_MODE=true"))
     throw new Error("E2E requires local file storage and mock mode");
   try {
-    originalState = await readFile("data/cms.json", "utf8");
+    originalState = await readFile(
+      path.join(process.env.DATA_DIR || "data", "cms.json"),
+      "utf8",
+    );
   } catch {
     originalState = null;
   }
 });
 test.afterEach(async () => {
-  if (originalState !== null) await writeFile("data/cms.json", originalState);
-  else await unlink("data/cms.json").catch(() => undefined);
+  if (originalState !== null)
+    await writeFile(
+      path.join(process.env.DATA_DIR || "data", "cms.json"),
+      originalState,
+    );
+  else
+    await unlink(path.join(process.env.DATA_DIR || "data", "cms.json")).catch(
+      () => undefined,
+    );
 });
 test("independent CMS: login, draft, publication, pairing, revocation, responsive display", async ({
   page,
@@ -30,7 +40,7 @@ test("independent CMS: login, draft, publication, pairing, revocation, responsiv
   await page.goto("/demo");
   await expect(page.getByRole("heading", { name: "今日課程" })).toBeVisible();
   await page.screenshot({
-    path: "docs/screenshots/lobby-desktop.png",
+    path: "test-results/lobby-desktop.png",
     fullPage: true,
   });
   expect(
@@ -40,7 +50,7 @@ test("independent CMS: login, draft, publication, pairing, revocation, responsiv
   ).toBe(true);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
-    path: "docs/screenshots/lobby-mobile.png",
+    path: "test-results/lobby-mobile.png",
     fullPage: true,
   });
   expect(
@@ -63,7 +73,7 @@ test("independent CMS: login, draft, publication, pairing, revocation, responsiv
     page.getByRole("heading", { name: "今天，也讓美好被看見。" }),
   ).toBeVisible();
   await page.screenshot({
-    path: "docs/screenshots/admin-overview.png",
+    path: "test-results/admin-overview.png",
     fullPage: true,
   });
   await page.getByRole("button", { name: "公告管理", exact: true }).click();
@@ -88,28 +98,70 @@ test("independent CMS: login, draft, publication, pairing, revocation, responsiv
   await expect(page.getByRole("status")).toContainText("已發布");
   data = (await (await page.request.get("/api/admin/content")).json()).data;
   const firstVersion = data.published.version;
-  const pairResponse = await page.request.post("/api/admin/screens", {
-    headers: { Origin: origin },
-    data: { name: "E2E 大廳" },
-  });
-  expect(pairResponse.status()).toBe(201);
-  const { code } = (await pairResponse.json()).data;
   const device = await browser.newContext();
   const screen = await device.newPage();
   await screen.goto(origin + "/display");
-  await screen.getByLabel("六位數配對碼").fill(code);
-  await screen.getByRole("button", { name: "配對這台螢幕" }).click();
-  await expect(screen.getByText("E2E 公告：歡迎每一個家庭。")).toBeVisible();
-  const reuse = await device.request.post(origin + "/api/pair", {
-    headers: { Origin: origin },
-    data: { code },
+  const displayedCode = screen.getByLabel("螢幕配對碼");
+  await expect(displayedCode).toHaveText(/^\d{6}$/);
+  const code = (await displayedCode.textContent())!.trim();
+  await page.getByRole("button", { name: "螢幕管理", exact: true }).click();
+  await page.getByLabel("螢幕名稱").fill("E2E 大廳");
+  await page.getByLabel("螢幕顯示的配對碼").fill(code);
+  await page.getByRole("button", { name: "配對螢幕", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("配對成功");
+  await expect(screen.getByText("E2E 公告：歡迎每一個家庭。")).toBeVisible({
+    timeout: 15000,
   });
-  expect(reuse.status()).toBe(403);
+  // A retry after approval must not replace the valid screen credential.
+  expect(
+    (
+      await device.request.post(origin + "/api/pair", {
+        headers: { Origin: origin },
+      })
+    ).status(),
+  ).toBe(409);
+  expect((await device.request.get(origin + "/api/display")).status()).toBe(
+    200,
+  );
+  const reuse = await page.request.post(origin + "/api/admin/screens", {
+    headers: { Origin: origin },
+    data: { name: "重用測試", code },
+  });
+  expect(reuse.status()).toBe(400);
+  expect(
+    (
+      await device.request.post(origin + "/api/admin/screens", {
+        headers: { Origin: origin },
+        data: { name: "未登入", code },
+      })
+    ).status(),
+  ).toBe(401);
   const payload = (
     await (await device.request.get(origin + "/api/display")).json()
   ).data;
   expect(payload.version).toBe(firstVersion);
   expect(JSON.stringify(payload)).not.toContain("tokenHash");
+  // Expired screen codes cannot be approved, even by a signed-in administrator.
+  const expiredDevice = await browser.newContext();
+  const createExpired = await expiredDevice.request.post(origin + "/api/pair", {
+    headers: { Origin: origin },
+  });
+  expect(createExpired.status()).toBe(201);
+  const expiredCode = (await createExpired.json()).data.code;
+  const statePath = path.join(process.env.DATA_DIR || "data", "cms.json");
+  const fileState = JSON.parse(await readFile(statePath, "utf8"));
+  for (const pending of fileState.pendingPairings)
+    pending.expiresAt = "2000-01-01T00:00:00.000Z";
+  await writeFile(statePath, JSON.stringify(fileState));
+  const expiredApproval = await page.request.post(
+    origin + "/api/admin/screens",
+    {
+      headers: { Origin: origin },
+      data: { name: "過期測試", code: expiredCode },
+    },
+  );
+  expect(expiredApproval.status()).toBe(400);
+  await expiredDevice.close();
   // Device heartbeats must not invalidate an editor's draft revision.
   data = (await (await page.request.get("/api/admin/content")).json()).data;
   const saveAfterHeartbeat = await page.request.put("/api/admin/content", {
@@ -154,7 +206,7 @@ test("independent CMS: login, draft, publication, pairing, revocation, responsiv
   await screen.reload();
   await expect(screen.getByRole("heading", { name: "今日課程" })).toBeVisible();
   await screen.screenshot({
-    path: "docs/screenshots/lobby-offline.png",
+    path: "test-results/lobby-offline.png",
     fullPage: true,
   });
   await device.setOffline(false);
@@ -171,7 +223,34 @@ test("independent CMS: login, draft, publication, pairing, revocation, responsiv
     ).ok(),
   ).toBe(true);
   expect((await device.request.get(origin + "/api/display")).status()).toBe(
+    423,
+  );
+  await screen.reload();
+  await expect(screen.getByText("螢幕已停用，請由管理員重新啟用")).toBeVisible();
+  expect(await screen.getByLabel("螢幕配對碼").count()).toBe(0);
+  expect(
+    (
+      await page.request.patch("/api/admin/screens", {
+        headers: { Origin: origin },
+        data: { id: target.id, enabled: true },
+      })
+    ).ok(),
+  ).toBe(true);
+  await screen.reload();
+  await expect(screen.getByRole("heading", { name: "今日課程" })).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "螢幕管理", exact: true }).click();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "刪除 E2E 大廳" }).click();
+  await expect(page.getByRole("status")).toContainText("已刪除螢幕");
+  expect((await device.request.get(origin + "/api/display")).status()).toBe(
     403,
+  );
+  const afterDelete = (
+    await (await page.request.get("/api/admin/screens")).json()
+  ).data;
+  expect(afterDelete.some((s: { id: string }) => s.id === target.id)).toBe(
+    false,
   );
   const upload = await page.request.post("/api/admin/upload", {
     headers: { Origin: origin },
@@ -196,7 +275,9 @@ test("independent CMS: login, draft, publication, pairing, revocation, responsiv
   expect((await request.get(media)).headers()["content-type"]).toBe(
     "image/png",
   );
-  await unlink(path.join("data", "uploads", path.basename(media)));
+  await unlink(
+    path.join(process.env.DATA_DIR || "data", "uploads", path.basename(media)),
+  );
   expect(
     (
       await request.get(

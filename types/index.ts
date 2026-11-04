@@ -45,6 +45,11 @@ export interface PairCode {
   screenId: string;
   expiresAt: string;
 }
+export interface PendingPairing {
+  codeHash: string;
+  tokenHash: string;
+  expiresAt: string;
+}
 export interface CmsState {
   revision: number;
   contentRevision: number;
@@ -53,6 +58,7 @@ export interface CmsState {
   previous: Publication | null;
   screens: Screen[];
   pairCodes: PairCode[];
+  pendingPairings?: PendingPairing[];
 }
 export interface Lesson {
   id: string;
