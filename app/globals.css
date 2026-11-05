@@ -2301,3 +2301,14 @@ p {
   outline: 2px solid #a66e50;
   outline-offset: 2px;
 }
+
+/* On landscape signage the footer already sits at the bottom in the flex
+   layout. Keep it in that layout during awards to avoid resizing the schedule. */
+@media (min-width: 801px) {
+  .signage.award-active > .announcement-bar {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+  }
+}
