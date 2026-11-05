@@ -3,6 +3,7 @@ import { hashToken, HttpError } from "@/lib/auth";
 import { fail, ok } from "@/lib/http";
 import { fetchSchedule } from "@/lib/main-system-client";
 import { mutateState, readState } from "@/lib/store";
+import { maybeCleanupAlbumTrash } from "@/lib/album-trash";
 export const dynamic = "force-dynamic";
 export async function GET() {
   try {
@@ -15,6 +16,7 @@ export async function GET() {
       throw new HttpError(423, "螢幕已停用，請由管理員重新啟用");
     if (!state.published)
       throw new HttpError(404, "尚未發布內容，請至管理後台發布");
+    await maybeCleanupAlbumTrash().catch(() => undefined);
     const schedule = await fetchSchedule();
     if (
       !screen.lastSeen ||

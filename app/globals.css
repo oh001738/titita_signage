@@ -2312,3 +2312,176 @@ p {
     bottom: auto;
   }
 }
+
+.album-editor > p {
+  color: #7d7166;
+  font-size: 14px;
+}
+.album-editor .editor-card {
+  margin-bottom: 20px;
+}
+.album-upload {
+  display: inline-flex;
+  padding: 8px 12px;
+  cursor: pointer;
+  background: #edf5eb;
+  border-radius: 8px;
+}
+.album-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.album-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.album-photo {
+  border: 1px solid #e5ece3;
+  padding: 9px;
+  border-radius: 10px;
+  min-width: 0;
+}
+.album-photo img {
+  display: block;
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 7px;
+}
+.album-photo input:not([type="checkbox"]) {
+  width: 100%;
+}
+.album-photo-actions {
+  display: flex;
+  gap: 5px;
+  margin-top: 8px;
+}
+.album-photo-actions button {
+  padding: 5px 9px;
+}
+.album-trash-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e7ece5;
+}
+.album-trash-row small {
+  display: block;
+  color: #829589;
+}
+
+.activity-display {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  padding: 2.5vh 2.5vw calc(12.1vh + 12px);
+  background: #f9f6ef;
+  animation: signage-fade-in 0.5s ease both;
+}
+.activity-image-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #dfd5c6;
+}
+.activity-image-frame img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  animation: signage-fade-in 0.5s ease both;
+}
+.activity-gradient {
+  position: absolute;
+  inset: 45% 0 0;
+  background: linear-gradient(transparent, #142820df);
+  pointer-events: none;
+}
+.activity-brand {
+  position: absolute;
+  top: 3vh;
+  left: 2.5vw;
+  color: white;
+  text-shadow: 0 2px 6px #0009;
+  font-size: clamp(14px, 1.4vw, 28px);
+  font-weight: 700;
+}
+.activity-caption {
+  position: absolute;
+  left: 3vw;
+  right: 3vw;
+  bottom: 3vh;
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 2vw;
+  color: #fff;
+  text-shadow: 0 2px 8px #000a;
+}
+.activity-caption h1 {
+  font-size: clamp(25px, 3vw, 60px);
+  margin: 0.5vh 0;
+  overflow-wrap: anywhere;
+}
+.activity-caption small {
+  font-size: clamp(10px, 0.8vw, 16px);
+  letter-spacing: 0.12em;
+}
+.activity-caption p {
+  font-size: clamp(14px, 1.3vw, 24px);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.activity-caption > span {
+  background: #26372ab3;
+  padding: 8px 16px;
+  border-radius: 25px;
+  white-space: nowrap;
+}
+@media (max-width: 800px) {
+  .activity-display {
+    padding-bottom: calc(124px + 2vh);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .activity-display,
+  .activity-image-frame img {
+    animation: none;
+  }
+}
+
+.album-photo-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+.album-photo-toolbar label {
+  margin: 0;
+}
+
+.activity-display-exit {
+  animation: award-fade-out 0.5s ease both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .activity-display-exit {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+.album-preview-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 14px;
+  border: 1px solid #dce5db;
+  border-radius: 8px;
+  text-decoration: none;
+}

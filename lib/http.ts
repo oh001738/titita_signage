@@ -29,7 +29,10 @@ export function fail(error: unknown) {
     { status, headers: { "Cache-Control": "no-store" } },
   );
 }
-export async function jsonBody(request: Request): Promise<unknown> {
+export async function jsonBody(
+  request: Request,
+  maxBytes = 128 * 1024,
+): Promise<unknown> {
   const reader = request.body?.getReader();
   if (!reader) throw new HttpError(400, "缺少請求資料");
   const chunks: Uint8Array[] = [];
@@ -38,7 +41,7 @@ export async function jsonBody(request: Request): Promise<unknown> {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > 128 * 1024) {
+    if (size > maxBytes) {
       await reader.cancel();
       throw new HttpError(413, "資料超過大小限制");
     }

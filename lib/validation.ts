@@ -39,6 +39,39 @@ export const contentSchema = z
           .refine(validWindow, "下架時間必須晚於上架時間"),
       )
       .max(30),
+    albums: z
+      .array(
+        z
+          .object({
+            id: text(80).min(1),
+            title: text(80).min(1),
+            date: z.union([z.literal(""), z.iso.date()]),
+            description: text(160),
+            enabled: z.boolean(),
+            duration: z.number().int().min(5).max(60),
+            batchSize: z.number().int().min(1).max(10),
+            fit: z.enum(["contain", "cover"]),
+            ...windowFields,
+            photos: z
+              .array(
+                z.object({
+                  id: text(80).min(1),
+                  image: localImage,
+                  original: localImage.optional(),
+                  caption: text(80),
+                  selected: z.boolean(),
+                }),
+              )
+              .max(100),
+          })
+          .refine(validWindow, "下架時間必須晚於上架時間")
+          .refine(
+            (a) => new Set(a.photos.map((p) => p.id)).size === a.photos.length,
+            "照片 ID 重複",
+          ),
+      )
+      .max(30)
+      .default([]),
     awards: z
       .array(
         z
@@ -104,7 +137,8 @@ export const contentSchema = z
       new Set(v.announcements.map((a) => a.id)).size ===
         v.announcements.length &&
       new Set(v.posters.map((p) => p.id)).size === v.posters.length &&
-      new Set(v.awards.map((a) => a.id)).size === v.awards.length,
+      new Set(v.awards.map((a) => a.id)).size === v.awards.length &&
+      new Set(v.albums.map((a) => a.id)).size === v.albums.length,
     "內容 ID 重複",
   );
 export const lessonSchema = z.object({

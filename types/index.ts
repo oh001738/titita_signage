@@ -33,6 +33,40 @@ export interface Award {
   endsAt: string;
   recipients: AwardRecipient[];
 }
+export interface AlbumPhoto {
+  id: string;
+  image: string;
+  original?: string;
+  caption: string;
+  selected: boolean;
+}
+export interface ActivityAlbum {
+  id: string;
+  title: string;
+  date: string;
+  description: string;
+  enabled: boolean;
+  startsAt: string;
+  endsAt: string;
+  duration: number;
+  batchSize: number;
+  fit: "contain" | "cover";
+  photos: AlbumPhoto[];
+}
+export type AlbumTrashItem = {
+  id: string;
+  deletedAt: string;
+  expiresAt: string;
+} & (
+  | { kind: "album"; album: ActivityAlbum; index: number }
+  | {
+      kind: "photo";
+      albumId: string;
+      albumTitle: string;
+      photo: AlbumPhoto;
+      index: number;
+    }
+);
 export interface Content {
   schoolName: string;
   logo?: string;
@@ -46,6 +80,7 @@ export interface Content {
   announcements: Announcement[];
   posters: Poster[];
   awards?: Award[];
+  albums?: ActivityAlbum[];
 }
 export interface Publication {
   version: number;
@@ -79,6 +114,10 @@ export interface CmsState {
   screens: Screen[];
   pairCodes: PairCode[];
   pendingPairings?: PendingPairing[];
+  albumTrash?: AlbumTrashItem[];
+  pendingAlbumMedia?: string[];
+  deletedAlbumMedia?: string[];
+  pendingAlbumUnlinks?: string[];
 }
 export interface Lesson {
   id: string;

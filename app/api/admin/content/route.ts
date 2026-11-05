@@ -3,6 +3,10 @@ import { requireAdmin } from "@/lib/auth";
 import { fail, jsonBody, ok } from "@/lib/http";
 import { ConflictError, mutateState, readState } from "@/lib/store";
 import { contentSchema } from "@/lib/validation";
+import {
+  collectDeletedAlbums,
+  ensureNoDeletedAlbumMedia,
+} from "@/lib/album-trash";
 export const dynamic = "force-dynamic";
 export async function GET() {
   try {
@@ -13,6 +17,7 @@ export async function GET() {
       draft: s.draft,
       published: s.published,
       previous: s.previous,
+      albumTrash: s.albumTrash ?? [],
     });
   } catch (e) {
     return fail(e);
@@ -26,10 +31,18 @@ export async function PUT(request: Request) {
         revision: z.number().int().nonnegative(),
         content: contentSchema,
       })
-      .parse(await jsonBody(request));
+      .parse(await jsonBody(request, 2 * 1024 * 1024));
     await mutateState((s) => {
       if (s.contentRevision !== body.revision)
         throw new ConflictError("內容已更新，請重新載入後再編輯");
+      ensureNoDeletedAlbumMedia(s, body.content);
+      s.albumTrash = [
+        ...(s.albumTrash ?? []),
+        ...collectDeletedAlbums(
+          s.draft.albums ?? [],
+          body.content.albums ?? [],
+        ),
+      ];
       s.draft = body.content;
       s.contentRevision++;
     });
@@ -39,6 +52,7 @@ export async function PUT(request: Request) {
       draft: s.draft,
       published: s.published,
       previous: s.previous,
+      albumTrash: s.albumTrash ?? [],
     });
   } catch (e) {
     return fail(e);

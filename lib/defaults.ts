@@ -11,6 +11,7 @@ export function defaultContent(): Content {
     hideEnded: false,
     theme: "cream",
     awards: [],
+    albums: [],
     announcements: [
       {
         id: "welcome",

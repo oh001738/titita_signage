@@ -16,6 +16,7 @@ import { isActive, taiwanDate, taiwanTime } from "@/lib/time";
 import { selectDisplayLessons } from "@/lib/display-schedule";
 import { awardPages } from "@/lib/award-pages";
 import { AwardDisplay } from "@/components/AwardDisplay";
+import { AlbumDisplay } from "@/components/AlbumDisplay";
 function lessonStatus(lesson: Lesson, now: Date) {
   if (lesson.status === "cancelled")
     return { text: "已取消", style: "cancelled" };
@@ -132,7 +133,11 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
   const [paused, setPaused] = useState(false);
   const [showAward, setShowAward] = useState(false);
   const [awardFading, setAwardFading] = useState(false);
-  const [awardCursor, setAwardCursor] = useState(0);
+  const [interludeCursor, setInterludeCursor] = useState(0);
+  const [showAlbum, setShowAlbum] = useState(false);
+  const [albumFading, setAlbumFading] = useState(false);
+  const [albumStep, setAlbumStep] = useState(0);
+  const [albumOffsets, setAlbumOffsets] = useState<Record<string, number>>({});
   useEffect(() => {
     if (mode === "demo") {
       const date = taiwanDate();
@@ -236,38 +241,103 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     return () => clearTimeout(timer);
   }, [posterIndex, poster?.duration, paused, posters.length]);
   const activeAwardPages = awardPages(content?.awards ?? [], now);
+  const activeAlbums = (content?.albums ?? []).filter(
+    (a) => a.enabled && isActive(a, now) && a.photos.some((p) => p.selected),
+  );
+  const interludes = [
+    ...activeAwardPages.map((page) => ({
+      kind: "award" as const,
+      page,
+      key: `award:${page.award.id}:${page.page}`,
+    })),
+    ...activeAlbums.map((album) => ({
+      kind: "album" as const,
+      album,
+      key: `album:${album.id}`,
+    })),
+  ];
+  const currentInterlude =
+    interludes[interludeCursor % Math.max(1, interludes.length)];
   const currentAwardPage =
-    activeAwardPages[awardCursor % Math.max(1, activeAwardPages.length)];
-  const activeAwardsKey = activeAwardPages
-    .map((item) => `${item.award.id}:${item.page}`)
-    .join(",");
+    currentInterlude?.kind === "award" ? currentInterlude.page : undefined;
+  const currentAlbum =
+    currentInterlude?.kind === "album" ? currentInterlude.album : undefined;
+  const albumPhotos = currentAlbum?.photos.filter((p) => p.selected) ?? [];
+  const albumOffset = currentAlbum ? (albumOffsets[currentAlbum.id] ?? 0) : 0;
+  const albumPosition =
+    (albumOffset + albumStep) % Math.max(1, albumPhotos.length);
+  const currentAlbumPhoto = albumPhotos[albumPosition];
+  const batchCount = Math.min(currentAlbum?.batchSize ?? 0, albumPhotos.length);
+  const activeInterludesKey = interludes.map((item) => item.key).join(",");
   useEffect(() => {
-    if (paused || !activeAwardsKey || awardFading) return;
-    const timer = setTimeout(
-      () => {
-        if (showAward) {
-          setAwardFading(true);
-        } else setShowAward(true);
-      },
-      showAward ? (currentAwardPage?.award.duration ?? 15) * 1000 : 40_000,
-    );
+    if (paused || !activeInterludesKey || awardFading || albumFading) return;
+    const seconds = showAward
+      ? (currentAwardPage?.award.duration ?? 15)
+      : showAlbum
+        ? (currentAlbum?.duration ?? 8)
+        : 40;
+    const timer = setTimeout(() => {
+      if (showAward) setAwardFading(true);
+      else if (showAlbum) {
+        if (albumStep + 1 < batchCount) setAlbumStep((value) => value + 1);
+        else {
+          setAlbumFading(true);
+        }
+      } else if (currentInterlude?.kind === "award") setShowAward(true);
+      else if (currentInterlude?.kind === "album") {
+        setAlbumStep(0);
+        setShowAlbum(true);
+      }
+    }, seconds * 1000);
     return () => clearTimeout(timer);
   }, [
     paused,
     showAward,
+    showAlbum,
     awardFading,
-    activeAwardsKey,
+    albumFading,
+    activeInterludesKey,
     currentAwardPage?.award.duration,
+    currentAlbum?.duration,
+    currentAlbum?.id,
+    currentAlbum?.batchSize,
+    albumStep,
+    batchCount,
+    albumOffset,
+    albumPhotos.length,
+    currentInterlude?.kind,
   ]);
   useEffect(() => {
     if (!awardFading) return;
     const timer = setTimeout(() => {
       setShowAward(false);
       setAwardFading(false);
-      setAwardCursor((value) => value + 1);
+      setInterludeCursor((value) => value + 1);
     }, 500);
     return () => clearTimeout(timer);
   }, [awardFading]);
+  useEffect(() => {
+    if (!albumFading) return;
+    const timer = setTimeout(() => {
+      if (currentAlbum)
+        setAlbumOffsets((offsets) => ({
+          ...offsets,
+          [currentAlbum.id]:
+            (albumOffset + batchCount) % Math.max(1, albumPhotos.length),
+        }));
+      setShowAlbum(false);
+      setAlbumFading(false);
+      setAlbumStep(0);
+      setInterludeCursor((value) => value + 1);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [
+    albumFading,
+    currentAlbum?.id,
+    albumOffset,
+    batchCount,
+    albumPhotos.length,
+  ]);
   const today = taiwanDate(now);
   const schedule = payload?.schedule;
   const isExpired =
@@ -382,7 +452,7 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     );
   return (
     <main
-      className={`signage ${content?.theme === "mint" ? "mint" : ""} ${showAward && currentAwardPage ? "award-active" : ""}`}
+      className={`signage ${content?.theme === "mint" ? "mint" : ""} ${(showAward && currentAwardPage) || (showAlbum && currentAlbumPhoto) ? "award-active" : ""}`}
     >
       <header className="display-header">
         <div className="brand">
@@ -580,6 +650,16 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
           fading={awardFading}
           schoolName={content?.schoolName ?? "梯梯塔音樂坊"}
           logo={content?.logo}
+        />
+      )}
+      {showAlbum && currentAlbum && currentAlbumPhoto && (
+        <AlbumDisplay
+          album={currentAlbum}
+          photo={currentAlbumPhoto}
+          fading={albumFading}
+          position={albumPosition}
+          total={albumPhotos.length}
+          schoolName={content?.schoolName ?? "梯梯塔音樂坊"}
         />
       )}
       <div className="display-controls">

@@ -23,22 +23,31 @@ import {
   FileText,
   Link as LinkIcon,
 } from "lucide-react";
-import type { Content, Publication, Screen } from "@/types";
+import type { Content, Publication, Screen, AlbumTrashItem } from "@/types";
 import { createContentId } from "@/lib/content-id";
 import { AwardsEditor } from "@/components/AwardsEditor";
+import { AlbumsEditor } from "@/components/AlbumsEditor";
 type Section =
-  "overview" | "announcements" | "posters" | "awards" | "settings" | "screens";
+  | "overview"
+  | "announcements"
+  | "posters"
+  | "awards"
+  | "albums"
+  | "settings"
+  | "screens";
 interface EditorState {
   revision: number;
   draft: Content;
   published: Publication | null;
   previous: Publication | null;
+  albumTrash?: AlbumTrashItem[];
 }
 const navigation = [
   { id: "overview", label: "總覽", icon: LayoutDashboard },
   { id: "announcements", label: "公告管理", icon: Bell },
   { id: "posters", label: "海報輪播", icon: Images },
   { id: "awards", label: "榮耀時刻", icon: Music2 },
+  { id: "albums", label: "活動相簿", icon: Images },
   { id: "settings", label: "畫面與課表", icon: Settings2 },
   { id: "screens", label: "螢幕管理", icon: Monitor },
 ] as const;
@@ -814,6 +823,51 @@ export function Admin() {
                 setIsDirty(true);
                 setMessage("");
               }}
+            />
+          )}
+          {section === "albums" && (
+            <AlbumsEditor
+              albums={form.albums ?? []}
+              trash={state.albumTrash ?? []}
+              busy={isLoading}
+              onBusyChange={setIsLoading}
+              onChange={(fn) => {
+                setForm((current) =>
+                  current
+                    ? { ...current, albums: fn(current.albums ?? []) }
+                    : current,
+                );
+                setIsDirty(true);
+                setMessage("");
+              }}
+              onPurge={(id) =>
+                void run(async () => {
+                  const latest = isDirty ? await save() : state;
+                  const updated = await api<EditorState>(
+                    "/api/admin/album-trash",
+                    "POST",
+                    { id, action: "purge", revision: latest.revision },
+                  );
+                  setState(updated);
+                  setForm(updated.draft);
+                  setIsDirty(false);
+                  setMessage("已永久刪除回收站項目；仍被使用的圖片會保留");
+                })
+              }
+              onRestore={(id) =>
+                void run(async () => {
+                  const latest = isDirty ? await save() : state;
+                  const updated = await api<EditorState>(
+                    "/api/admin/album-trash",
+                    "POST",
+                    { id, revision: latest.revision },
+                  );
+                  setState(updated);
+                  setForm(updated.draft);
+                  setIsDirty(false);
+                  setMessage("已還原至草稿，發布後才會顯示");
+                })
+              }
             />
           )}
           {section === "settings" && (
