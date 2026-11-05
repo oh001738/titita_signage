@@ -129,7 +129,6 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
   const [pairCode, setPairCode] = useState("");
   const [noticeIndex, setNoticeIndex] = useState(0);
   const [posterIndex, setPosterIndex] = useState(0);
-  const [page, setPage] = useState(0);
   const [paused, setPaused] = useState(false);
   const [showAward, setShowAward] = useState(false);
   const [awardFading, setAwardFading] = useState(false);
@@ -188,7 +187,7 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
         if (disposed) return;
         const data = body.data as DisplayPayload;
         setPayload(data);
-        setOffset(Date.parse(data.serverTime) - Date.now());
+        if (mode === "preview") setOffset(Date.parse(data.serverTime) - Date.now());
         setError("");
         setPairRequired(false);
         if (mode === "screen")
@@ -211,6 +210,34 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
       disposed = true;
       clearInterval(timer);
     };
+  }, [mode]);
+  // Use short authenticated requests to estimate server time without including
+  // the potentially slow OneCloud schedule request in the clock calculation.
+  useEffect(() => {
+    if (mode !== "screen") return;
+    let cancelled = false;
+    async function calibrate() {
+      let best: { delay: number; offset: number } | undefined;
+      for (let i = 0; i < 3; i++) {
+        try {
+          const start = Date.now();
+          const response = await fetch("/api/sync-time", { cache: "no-store" });
+          const body = await response.json();
+          const end = Date.now();
+          if (!response.ok || !body.data) continue;
+          const { receivedAt, sentAt } = body.data as { receivedAt: number; sentAt: number };
+          const delay = end - start - (sentAt - receivedAt);
+          const sample = { delay, offset: ((receivedAt - start) + (sentAt - end)) / 2 };
+          if (!best || sample.delay < best.delay) best = sample;
+        } catch {
+          // Keep the previous estimate when disconnected.
+        }
+      }
+      if (!cancelled && best) setOffset(best.offset);
+    }
+    void calibrate();
+    const timer = setInterval(calibrate, 60_000);
+    return () => { cancelled = true; clearInterval(timer); };
   }, [mode]);
   useEffect(() => {
     const timer = setInterval(
@@ -356,11 +383,12 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     hasScheduled,
   } = selectDisplayLessons(eligibleLessons, now);
   const pages = Math.max(1, Math.ceil(lessons.length / 4));
+  const currentPage = Math.floor(now.getTime() / 12_000) % pages;
+  const frozenPage = useRef(0);
   useEffect(() => {
-    if (paused || pages < 2) return;
-    const timer = setInterval(() => setPage((p) => p + 1), 12_000);
-    return () => clearInterval(timer);
-  }, [paused, pages]);
+    if (!paused) frozenPage.current = currentPage;
+  }, [paused, currentPage]);
+  const page = paused ? frozenPage.current : currentPage;
   const notices = (content?.announcements ?? []).filter((a) =>
     isActive(a, now),
   );
