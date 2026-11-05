@@ -2229,3 +2229,75 @@ p {
     padding-bottom: calc(124px + 2vh);
   }
 }
+
+/* Trial logo keeps its proportions across television and preview sizes. */
+.display-brand-logo {
+  display: block;
+  width: min(32vw, 600px);
+  height: 12vh;
+  max-height: 110px;
+  object-fit: contain;
+  object-position: left center;
+}
+.award-brand-logo {
+  display: block;
+  width: min(25vw, 420px);
+  height: 7vh;
+  object-fit: contain;
+  object-position: left center;
+}
+@media (max-width: 800px) {
+  .display-brand-logo {
+    width: min(42vw, 300px);
+    height: 70px;
+  }
+  .award-brand-logo {
+    width: min(38vw, 240px);
+    height: 45px;
+  }
+}
+
+.logo-editor {
+  margin: 18px 0;
+}
+.logo-editor-preview {
+  display: flex;
+  align-items: center;
+  min-height: 92px;
+  padding: 12px;
+  margin: 10px 0;
+  border: 1px solid #e6ddd1;
+  border-radius: 10px;
+  background: #faf7f0;
+  color: #7d7166;
+}
+.logo-editor-preview img {
+  display: block;
+  max-width: 100%;
+  width: 320px;
+  height: 75px;
+  object-fit: contain;
+  object-position: left center;
+}
+.logo-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.logo-editor-actions .logo-upload {
+  display: inline-flex;
+  cursor: pointer;
+  margin: 0;
+}
+.logo-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+.logo-upload:focus-within {
+  outline: 2px solid #a66e50;
+  outline-offset: 2px;
+}

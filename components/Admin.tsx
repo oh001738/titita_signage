@@ -831,6 +831,63 @@ export function Admin() {
                     onChange={(e) => update("schoolName", e.target.value)}
                   />
                 </label>
+                <div className="logo-editor">
+                  <strong>教室 Logo</strong>
+                  <p className="field-hint">
+                    建議使用透明背景、橫式圖片；PNG / JPEG / WebP，最大 8 MB。
+                  </p>
+                  <div className="logo-editor-preview">
+                    {form.logo ? (
+                      <img src={form.logo} alt="教室 Logo 預覽" />
+                    ) : (
+                      <span>目前使用音符與教室名稱</span>
+                    )}
+                  </div>
+                  <div className="logo-editor-actions">
+                    <label className="logo-upload secondary">
+                      上傳或更換 Logo
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        disabled={isLoading}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          if (!file) return;
+                          void run(async () => {
+                            const data = new FormData();
+                            data.append("file", file);
+                            const response = await fetch("/api/admin/upload", {
+                              method: "POST",
+                              body: data,
+                            });
+                            const body = await response.json();
+                            if (!response.ok)
+                              throw new Error(body.error || "Logo 上傳失敗");
+                            update("logo", body.data.image);
+                            setMessage("Logo 已上傳，請儲存草稿並發布");
+                          });
+                        }}
+                      />
+                    </label>
+                    <button
+                      className="secondary"
+                      disabled={isLoading}
+                      onClick={() => update("logo", "/school-logo-trial.png")}
+                    >
+                      使用試排 Logo
+                    </button>
+                    {form.logo && (
+                      <button
+                        className="secondary"
+                        disabled={isLoading}
+                        onClick={() => update("logo", "")}
+                      >
+                        移除 Logo
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <label>
                   歡迎文字
                   <input

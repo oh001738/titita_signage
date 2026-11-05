@@ -386,13 +386,24 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     >
       <header className="display-header">
         <div className="brand">
-          <Music2 className="brand-mark" strokeWidth={1.4} />
-          <div>
-            <strong>{content?.schoolName.split(" ")[0]}</strong>
-            <span>
-              {content?.schoolName.split(" ").slice(1).join(" ") || "音樂教室"}
-            </span>
-          </div>
+          {content?.logo ? (
+            <img
+              className="display-brand-logo"
+              src={content.logo}
+              alt={content.schoolName}
+            />
+          ) : (
+            <>
+              <Music2 className="brand-mark" strokeWidth={1.4} />
+              <div>
+                <strong>{content?.schoolName.split(" ")[0]}</strong>
+                <span>
+                  {content?.schoolName.split(" ").slice(1).join(" ") ||
+                    "音樂教室"}
+                </span>
+              </div>
+            </>
+          )}
         </div>
         <div className="display-date">
           {new Intl.DateTimeFormat("zh-TW", {
@@ -568,6 +579,7 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
           {...currentAwardPage}
           fading={awardFading}
           schoolName={content?.schoolName ?? "梯梯塔音樂坊"}
+          logo={content?.logo}
         />
       )}
       <div className="display-controls">

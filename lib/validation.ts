@@ -10,6 +10,9 @@ const localImage = text(200).regex(
 export const contentSchema = z
   .object({
     schoolName: text(40).min(1),
+    logo: z
+      .union([z.literal(""), z.literal("/school-logo-trial.png"), localImage])
+      .default(""),
     welcome: text(50),
     footer: text(120),
     lineUrl: z.union([

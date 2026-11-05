@@ -2,6 +2,7 @@ import type { CmsState, Content, Lesson } from "@/types";
 export function defaultContent(): Content {
   return {
     schoolName: "TITITA 音樂教室",
+    logo: "",
     welcome: "歡迎來到音樂的日常",
     footer: "請依課程時間前往教室，讓音樂陪伴每一次成長。",
     lineUrl: "",

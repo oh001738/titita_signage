@@ -6,6 +6,7 @@ export function AwardDisplay({
   page,
   count,
   schoolName,
+  logo,
   fading,
 }: {
   award: Award;
@@ -13,6 +14,7 @@ export function AwardDisplay({
   page: number;
   count: number;
   schoolName: string;
+  logo?: string;
   fading: boolean;
 }) {
   return (
@@ -21,9 +23,13 @@ export function AwardDisplay({
       aria-label="榮耀時刻"
     >
       <div className="award-display-header">
-        <span>
-          <Music2 size={27} /> {schoolName}
-        </span>
+        {logo ? (
+          <img className="award-brand-logo" src={logo} alt={schoolName} />
+        ) : (
+          <span>
+            <Music2 size={27} /> {schoolName}
+          </span>
+        )}
         <small>SHINING MOMENTS · 榮耀時刻</small>
       </div>
       <div className="award-display-main">

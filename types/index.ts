@@ -35,6 +35,7 @@ export interface Award {
 }
 export interface Content {
   schoolName: string;
+  logo?: string;
   welcome: string;
   footer: string;
   lineUrl: string;
