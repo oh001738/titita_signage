@@ -192,10 +192,9 @@ p {
 }
 /* Full-screen lobby */
 .signage {
+  /* Chromium on signage players must retain the full viewport height. */
   min-height: 100vh;
-  min-height: 100svh;
   height: 100vh;
-  height: 100svh;
   overflow: hidden;
   background: var(--cream);
   padding: 0 2.5vw 2.1vh;
@@ -1766,7 +1765,6 @@ p {
   .signage {
     height: auto;
     min-height: 100vh;
-    min-height: 100svh;
     padding: 0 18px 24px;
     overflow: auto;
   }
