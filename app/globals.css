@@ -192,7 +192,9 @@ p {
 }
 /* Full-screen lobby */
 .signage {
+  min-height: 100vh;
   min-height: 100svh;
+  height: 100vh;
   height: 100svh;
   overflow: hidden;
   background: var(--cream);
@@ -1763,6 +1765,7 @@ p {
   }
   .signage {
     height: auto;
+    min-height: 100vh;
     min-height: 100svh;
     padding: 0 18px 24px;
     overflow: auto;
@@ -2207,5 +2210,24 @@ p {
 @media (max-width: 800px) {
   .award-display {
     padding-bottom: calc(2.1vh + max(10vh, 100px) + 12px);
+  }
+}
+
+/* On award slides, anchor the shared notice to the viewport even when the
+   schedule uses a scrollable small-screen layout. */
+.signage.award-active > .announcement-bar {
+  position: fixed;
+  left: 2.5vw;
+  right: 2.5vw;
+  bottom: 2.1vh;
+}
+@media (max-width: 800px) {
+  .signage.award-active > .announcement-bar {
+    left: 18px;
+    right: 18px;
+    bottom: 24px;
+  }
+  .award-display {
+    padding-bottom: calc(124px + 2vh);
   }
 }

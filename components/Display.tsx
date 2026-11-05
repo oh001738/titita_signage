@@ -381,7 +381,9 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
       </main>
     );
   return (
-    <main className={`signage ${content?.theme === "mint" ? "mint" : ""}`}>
+    <main
+      className={`signage ${content?.theme === "mint" ? "mint" : ""} ${showAward && currentAwardPage ? "award-active" : ""}`}
+    >
       <header className="display-header">
         <div className="brand">
           <Music2 className="brand-mark" strokeWidth={1.4} />
