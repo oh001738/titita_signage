@@ -11,7 +11,6 @@ services:
       MOCK_MODE: "false"
       CMS_STORAGE: mongo
       DATA_DIR: /app/data
-      COOKIE_SECURE: ${COOKIE_SECURE:-true}
     volumes:
       - signage-data:/app/data
     networks:

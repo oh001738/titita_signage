@@ -36,7 +36,7 @@ docker compose up -d
 docker compose logs --tail 50 signage
 ```
 
-Compose 強制 `MOCK_MODE=false` 與 `CMS_STORAGE=mongo`，避免誤將本機模擬設定部署為正式模式。HTTPS 終結建議由現有 NAS 反向代理處理，將對外網域轉至 3002，並保留 Host。Compose 的 `COOKIE_SECURE` 預設 true；只有明確的內網 HTTP 測試才設 false。瀏覽器對 HTTP 內網 IP 不提供 Service Worker，正式離線重載需要 HTTPS（localhost 本機例外）。
+Compose 強制 `MOCK_MODE=false` 與 `CMS_STORAGE=mongo`，避免誤將本機模擬設定部署為正式模式。HTTPS 終結建議由現有 NAS 反向代理處理，將對外網域轉至 3002，並保留 Host。`COOKIE_SECURE` 直接讀取 `.env.local`，未設定時應用程式預設 true；只有明確的內網 HTTP 測試才設 false。此設定不應在 Compose 的 `environment` 另設預設值，以免覆蓋 `env_file` 中的值。瀏覽器對 HTTP 內網 IP 不提供 Service Worker，正式離線重載需要 HTTPS（localhost 本機例外）。
 
 ## 初次使用
 
