@@ -36,6 +36,17 @@ pnpm start
 
 ## 連接 OneCloud 與 Docker
 
+### 修改管理員密碼
+
+在已設定 `.env.local` 的部署專案目錄執行：
+
+```sh
+sh scripts/change-admin-password.sh
+docker compose up -d --force-recreate signage
+```
+
+腳本相容 NAS 的 `sh`，隱藏輸入並確認新密碼，先建立權限為 600 的設定備份，再更新密碼雜湊及 session 金鑰；服務重新啟動後，所有管理員需重新登入。使用本機 Node.js，若未安裝則使用執行中的 `titita-signage` 容器（可用 `SIGNAGE_CONTAINER` 指定其他名稱）。本機 pnpm 模式請改為停止並重新啟動服務。備份含舊憑證，確認新密碼可登入後可移除。
+
 詳見 [部署及串接文件](docs/DEPLOYMENT.md) 與 [API 契約](docs/ONECLOUD_API.md)。OneCloud 端新增的來源程式位於相鄰專案 `titita_onecloud/app/api/internal/signage/schedule/route.ts`；須先部署該版本並設定專屬金鑰。
 
 ## 驗證
