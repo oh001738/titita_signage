@@ -531,14 +531,16 @@ p {
   justify-content: center;
   gap: 8px;
 }
-.poster-dots button {
+.poster-dots button,
+.poster-dots span {
   padding: 0;
   width: 8px;
   height: 8px;
   background: #fff9;
   border-radius: 50%;
 }
-.poster-dots button.active {
+.poster-dots button.active,
+.poster-dots span.active {
   background: var(--ink);
 }
 .poster-placeholder {

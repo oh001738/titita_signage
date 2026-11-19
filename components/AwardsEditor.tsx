@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { createContentId } from "@/lib/content-id";
+import { awardEffect } from "@/lib/award-pages";
 import type { Award } from "@/types";
 
 const localDate = (v: string) =>
@@ -36,7 +37,10 @@ export function AwardsEditor({
         sharedPrize: "",
         image: "",
         enabled: false,
-        duration: 15,
+        duration: 7,
+        effect: "spotlight",
+        playbackMode: "segmented",
+        segmentDuration: 45,
         startsAt: "",
         endsAt: "",
         recipients: [recipient()],
@@ -163,6 +167,70 @@ export function AwardsEditor({
               />
             </label>
           </div>
+          <div className="form-grid">
+            <label>
+              動畫效果
+              <select
+                value={awardEffect(a)}
+                onChange={(e) => {
+                  const effect = e.target.value as NonNullable<Award["effect"]>;
+                  change(a.id, (item) => ({
+                    ...item,
+                    effect,
+                    duration:
+                      effect === "spotlight" ? 7 : effect === "reveal" ? 9 : 15,
+                  }));
+                }}
+              >
+                <option value="reveal">榮耀揭幕（三位依序登場）</option>
+                <option value="spotlight">聚光登場（每次一位）</option>
+                <option value="classic">經典版面</option>
+              </select>
+            </label>
+            <label>
+              同場播放方式
+              <select
+                value={a.playbackMode ?? "segmented"}
+                onChange={(e) =>
+                  change(a.id, (item) => ({
+                    ...item,
+                    playbackMode: e.target.value as NonNullable<
+                      Award["playbackMode"]
+                    >,
+                  }))
+                }
+              >
+                <option value="segmented">分段播放，下次接續</option>
+                <option value="continuous">整場連續播完</option>
+              </select>
+            </label>
+          </div>
+          {(a.playbackMode ?? "segmented") === "segmented" && (
+            <label>
+              每段目標秒數（15–180）
+              <input
+                type="number"
+                min={15}
+                max={180}
+                value={a.segmentDuration ?? 45}
+                onChange={(e) =>
+                  change(a.id, (item) => ({
+                    ...item,
+                    segmentDuration: Number(e.target.value),
+                  }))
+                }
+              />
+              <span className="field-hint">
+                每段完整播完當頁學生後返回課表，下次接續下一頁。目標短於一頁時仍會完整播放一頁。
+              </span>
+            </label>
+          )}
+          <p className="field-hint">
+            {a.playbackMode === "continuous"
+              ? "同一場比賽依序播完所有學生後返回課表，不另設整場總時長上限。"
+              : "分段之間會播放課表 40 秒；如有其他獲獎紀錄或活動相簿，會依序穿插。"}
+            正式看板全自動播放，不顯示操作按鈕。
+          </p>
           {a.layout !== "competition" && (
             <label>
               獎項（可包含組別）
@@ -295,10 +363,10 @@ export function AwardsEditor({
           )}
           <div className="form-grid">
             <label>
-              每頁播放秒數（10–60）
+              {awardEffect(a) === "spotlight" ? "每位" : "每頁"}播放秒數（5–60）
               <input
                 type="number"
-                min={10}
+                min={5}
                 max={60}
                 value={a.duration}
                 onChange={(e) =>

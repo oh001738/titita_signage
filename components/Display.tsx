@@ -10,13 +10,35 @@ import {
   WifiOff,
   ArrowUpRight,
 } from "lucide-react";
-import type { DisplayPayload, Lesson, Poster } from "@/types";
+import type {
+  ActivityAlbum,
+  Award,
+  DisplayPayload,
+  Lesson,
+  Poster,
+} from "@/types";
 import { defaultContent, mockLessons } from "@/lib/defaults";
 import { isActive, taiwanDate, taiwanTime } from "@/lib/time";
 import { selectDisplayLessons } from "@/lib/display-schedule";
-import { awardPages } from "@/lib/award-pages";
+import { planAwardRun, type AwardPage } from "@/lib/award-pages";
 import { AwardDisplay } from "@/components/AwardDisplay";
 import { AlbumDisplay } from "@/components/AlbumDisplay";
+
+type Interlude =
+  | { kind: "award"; award: Award; key: string }
+  | { kind: "album"; album: ActivityAlbum; key: string };
+
+function followingInterludeKeys(
+  interludes: Interlude[],
+  key: string,
+): string[] {
+  const index = interludes.findIndex((item) => item.key === key);
+  if (index < 0) return interludes.map((item) => item.key);
+  return [...interludes.slice(index + 1), ...interludes.slice(0, index)].map(
+    (item) => item.key,
+  );
+}
+
 function lessonStatus(lesson: Lesson, now: Date) {
   if (lesson.status === "cancelled")
     return { text: "已取消", style: "cancelled" };
@@ -130,13 +152,33 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
   const [noticeIndex, setNoticeIndex] = useState(0);
   const [posterIndex, setPosterIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
   const [showAward, setShowAward] = useState(false);
   const [awardFading, setAwardFading] = useState(false);
-  const [interludeCursor, setInterludeCursor] = useState(0);
+  const [awardRun, setAwardRun] = useState<{
+    pages: AwardPage[];
+    nextPage: number;
+    step: number;
+    followingKeys: string[];
+  } | null>(null);
+  const [awardOffsets, setAwardOffsets] = useState<Record<string, number>>({});
+  const awardOffsetSignatures = useRef<Record<string, string>>({});
+  const [interludeCursor, setInterludeCursor] = useState<{
+    key: string | null;
+    followingKeys: string[];
+  }>({ key: null, followingKeys: [] });
   const [showAlbum, setShowAlbum] = useState(false);
   const [albumFading, setAlbumFading] = useState(false);
   const [albumStep, setAlbumStep] = useState(0);
   const [albumOffsets, setAlbumOffsets] = useState<Record<string, number>>({});
+  const albumOffsetSignatures = useRef<Record<string, string>>({});
+  const [albumRun, setAlbumRun] = useState<{
+    album: ActivityAlbum;
+    offset: number;
+    followingKeys: string[];
+  } | null>(null);
+  const playbackNow = useRef(now);
+  playbackNow.current = now;
   useEffect(() => {
     if (mode === "demo") {
       const date = taiwanDate();
@@ -187,7 +229,8 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
         if (disposed) return;
         const data = body.data as DisplayPayload;
         setPayload(data);
-        if (mode === "preview") setOffset(Date.parse(data.serverTime) - Date.now());
+        if (mode === "preview")
+          setOffset(Date.parse(data.serverTime) - Date.now());
         setError("");
         setPairRequired(false);
         if (mode === "screen")
@@ -225,9 +268,15 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
           const body = await response.json();
           const end = Date.now();
           if (!response.ok || !body.data) continue;
-          const { receivedAt, sentAt } = body.data as { receivedAt: number; sentAt: number };
+          const { receivedAt, sentAt } = body.data as {
+            receivedAt: number;
+            sentAt: number;
+          };
           const delay = end - start - (sentAt - receivedAt);
-          const sample = { delay, offset: ((receivedAt - start) + (sentAt - end)) / 2 };
+          const sample = {
+            delay,
+            offset: (receivedAt - start + (sentAt - end)) / 2,
+          };
           if (!best || sample.delay < best.delay) best = sample;
         } catch {
           // Keep the previous estimate when disconnected.
@@ -237,7 +286,10 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     }
     void calibrate();
     const timer = setInterval(calibrate, 60_000);
-    return () => { cancelled = true; clearInterval(timer); };
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, [mode]);
   useEffect(() => {
     const timer = setInterval(
@@ -247,7 +299,10 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     return () => clearInterval(timer);
   }, [offset]);
   useEffect(() => {
-    setPaused(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updatePreference = () => setReducedMotion(preference.matches);
+    updatePreference();
+    preference.addEventListener("change", updatePreference);
     if (
       mode === "screen" &&
       process.env.NODE_ENV === "production" &&
@@ -255,6 +310,7 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     ) {
       void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
     }
+    return () => preference.removeEventListener("change", updatePreference);
   }, [mode]);
   const content = payload?.content;
   const posters = (content?.posters ?? []).filter((p) => isActive(p, now));
@@ -267,15 +323,18 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     );
     return () => clearTimeout(timer);
   }, [posterIndex, poster?.duration, paused, posters.length]);
-  const activeAwardPages = awardPages(content?.awards ?? [], now);
+  const activeAwards = (content?.awards ?? []).filter(
+    (award) =>
+      award.enabled && isActive(award, now) && award.recipients.length > 0,
+  );
   const activeAlbums = (content?.albums ?? []).filter(
     (a) => a.enabled && isActive(a, now) && a.photos.some((p) => p.selected),
   );
-  const interludes = [
-    ...activeAwardPages.map((page) => ({
+  const interludes: Interlude[] = [
+    ...activeAwards.map((award) => ({
       kind: "award" as const,
-      page,
-      key: `award:${page.award.id}:${page.page}`,
+      award,
+      key: `award:${award.id}`,
     })),
     ...activeAlbums.map((album) => ({
       kind: "album" as const,
@@ -284,36 +343,157 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     })),
   ];
   const currentInterlude =
-    interludes[interludeCursor % Math.max(1, interludes.length)];
-  const currentAwardPage =
-    currentInterlude?.kind === "award" ? currentInterlude.page : undefined;
-  const currentAlbum =
-    currentInterlude?.kind === "album" ? currentInterlude.album : undefined;
+    [interludeCursor.key, ...interludeCursor.followingKeys]
+      .map((key) => interludes.find((item) => item.key === key))
+      .find((item) => item !== undefined) ?? interludes[0];
+  const currentAwardPage = awardRun?.pages[awardRun.step];
+  const latestAward = (content?.awards ?? []).find(
+    (award) => award.id === currentAwardPage?.award.id,
+  );
+  const currentAwardChanged =
+    !!currentAwardPage &&
+    !!latestAward &&
+    JSON.stringify(currentAwardPage.award) !== JSON.stringify(latestAward);
+  const currentAwardActive =
+    !!currentAwardPage &&
+    !currentAwardChanged &&
+    isActive(currentAwardPage.award, now) &&
+    activeAwards.some((award) => award.id === currentAwardPage.award.id);
+  const currentAlbum = albumRun?.album;
+  const latestAlbum = (content?.albums ?? []).find(
+    (album) => album.id === currentAlbum?.id,
+  );
+  const currentAlbumChanged =
+    !!currentAlbum &&
+    !!latestAlbum &&
+    JSON.stringify(currentAlbum) !== JSON.stringify(latestAlbum);
+  const currentAlbumActive =
+    !!currentAlbum &&
+    !currentAlbumChanged &&
+    isActive(currentAlbum, now) &&
+    activeAlbums.some((album) => album.id === currentAlbum.id);
   const albumPhotos = currentAlbum?.photos.filter((p) => p.selected) ?? [];
-  const albumOffset = currentAlbum ? (albumOffsets[currentAlbum.id] ?? 0) : 0;
+  const albumOffset = albumRun?.offset ?? 0;
   const albumPosition =
     (albumOffset + albumStep) % Math.max(1, albumPhotos.length);
   const currentAlbumPhoto = albumPhotos[albumPosition];
   const batchCount = Math.min(currentAlbum?.batchSize ?? 0, albumPhotos.length);
-  const activeInterludesKey = interludes.map((item) => item.key).join(",");
+  const hasInterludes = interludes.length > 0;
+  const playbackState = useRef({
+    interludes,
+    currentInterlude,
+    awardOffsets,
+    albumOffsets,
+  });
+  playbackState.current = {
+    interludes,
+    currentInterlude,
+    awardOffsets,
+    albumOffsets,
+  };
+  function advanceInterlude(completedKey: string, followingKeys: string[]) {
+    const latest = playbackState.current.interludes;
+    const stillPresent = latest.some((item) => item.key === completedKey);
+    const candidates = stillPresent
+      ? followingInterludeKeys(latest, completedKey)
+      : followingKeys;
+    const next =
+      candidates
+        .map((key) => latest.find((item) => item.key === key))
+        .find((item) => item !== undefined) ?? latest[0];
+    setInterludeCursor({
+      key: next?.key ?? null,
+      followingKeys: next ? followingInterludeKeys(latest, next.key) : [],
+    });
+  }
   useEffect(() => {
-    if (paused || !activeInterludesKey || awardFading || albumFading) return;
+    if (!showAward || currentAwardActive) return;
+    // Do not let a long continuous run retain content changed by a publication.
+    const awardId = currentAwardPage?.award.id;
+    if (awardId) {
+      setAwardOffsets((offsets) => ({ ...offsets, [awardId]: 0 }));
+      advanceInterlude(`award:${awardId}`, awardRun?.followingKeys ?? []);
+    }
+    setShowAward(false);
+    setAwardFading(false);
+    setAwardRun(null);
+  }, [showAward, currentAwardActive, currentAwardPage?.award.id]);
+  useEffect(() => {
+    if (!showAlbum || currentAlbumActive) return;
+    if (currentAlbum) {
+      setAlbumOffsets((offsets) => ({ ...offsets, [currentAlbum.id]: 0 }));
+      advanceInterlude(
+        `album:${currentAlbum.id}`,
+        albumRun?.followingKeys ?? [],
+      );
+    }
+    setShowAlbum(false);
+    setAlbumFading(false);
+    setAlbumStep(0);
+    setAlbumRun(null);
+  }, [showAlbum, currentAlbumActive, currentAlbum?.id]);
+  useEffect(() => {
+    if (
+      paused ||
+      !hasInterludes ||
+      awardFading ||
+      albumFading ||
+      (showAward && !currentAwardActive) ||
+      (showAlbum && !currentAlbumActive)
+    )
+      return;
     const seconds = showAward
       ? (currentAwardPage?.award.duration ?? 15)
       : showAlbum
         ? (currentAlbum?.duration ?? 8)
         : 40;
     const timer = setTimeout(() => {
-      if (showAward) setAwardFading(true);
-      else if (showAlbum) {
+      if (showAward && awardRun) {
+        if (awardRun.step + 1 < awardRun.pages.length)
+          setAwardRun((run) => (run ? { ...run, step: run.step + 1 } : run));
+        else setAwardFading(true);
+      } else if (showAlbum) {
         if (albumStep + 1 < batchCount) setAlbumStep((value) => value + 1);
         else {
           setAlbumFading(true);
         }
-      } else if (currentInterlude?.kind === "award") setShowAward(true);
-      else if (currentInterlude?.kind === "album") {
-        setAlbumStep(0);
-        setShowAlbum(true);
+      } else {
+        // Polling can replace an item without restarting the 40-second wait.
+        // Read the newest item when the wait ends instead of its old closure.
+        const latest = playbackState.current;
+        const next = latest.currentInterlude;
+        if (!next) return;
+        const followingKeys = followingInterludeKeys(
+          latest.interludes,
+          next.key,
+        );
+        setInterludeCursor({ key: next.key, followingKeys });
+        if (next.kind === "award") {
+          const signature = JSON.stringify(next.award);
+          const startPage =
+            awardOffsetSignatures.current[next.award.id] === signature
+              ? (latest.awardOffsets[next.award.id] ?? 0)
+              : 0;
+          const run = planAwardRun(next.award, playbackNow.current, startPage);
+          if (run.pages.length) {
+            awardOffsetSignatures.current[next.award.id] = signature;
+            setAwardRun({ ...run, step: 0, followingKeys });
+            setShowAward(true);
+          }
+        } else if (isActive(next.album, playbackNow.current)) {
+          const signature = JSON.stringify(next.album);
+          setAlbumRun({
+            album: next.album,
+            offset:
+              albumOffsetSignatures.current[next.album.id] === signature
+                ? (latest.albumOffsets[next.album.id] ?? 0)
+                : 0,
+            followingKeys,
+          });
+          albumOffsetSignatures.current[next.album.id] = signature;
+          setAlbumStep(0);
+          setShowAlbum(true);
+        }
       }
     }, seconds * 1000);
     return () => clearTimeout(timer);
@@ -323,8 +503,11 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     showAlbum,
     awardFading,
     albumFading,
-    activeInterludesKey,
+    hasInterludes,
     currentAwardPage?.award.duration,
+    currentAwardActive,
+    currentAlbumActive,
+    awardRun?.step,
     currentAlbum?.duration,
     currentAlbum?.id,
     currentAlbum?.batchSize,
@@ -333,16 +516,25 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     albumOffset,
     albumPhotos.length,
     currentInterlude?.kind,
+    currentInterlude?.key,
   ]);
   useEffect(() => {
     if (!awardFading) return;
     const timer = setTimeout(() => {
+      const awardId = awardRun?.pages[0]?.award.id;
+      if (awardId && awardRun)
+        setAwardOffsets((offsets) => ({
+          ...offsets,
+          [awardId]: awardRun.nextPage,
+        }));
       setShowAward(false);
       setAwardFading(false);
-      setInterludeCursor((value) => value + 1);
+      setAwardRun(null);
+      if (awardId)
+        advanceInterlude(`award:${awardId}`, awardRun?.followingKeys ?? []);
     }, 500);
     return () => clearTimeout(timer);
-  }, [awardFading]);
+  }, [awardFading, awardRun]);
   useEffect(() => {
     if (!albumFading) return;
     const timer = setTimeout(() => {
@@ -355,7 +547,12 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
       setShowAlbum(false);
       setAlbumFading(false);
       setAlbumStep(0);
-      setInterludeCursor((value) => value + 1);
+      setAlbumRun(null);
+      if (currentAlbum)
+        advanceInterlude(
+          `album:${currentAlbum.id}`,
+          albumRun?.followingKeys ?? [],
+        );
     }, 500);
     return () => clearTimeout(timer);
   }, [
@@ -480,7 +677,7 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     );
   return (
     <main
-      className={`signage ${content?.theme === "mint" ? "mint" : ""} ${(showAward && currentAwardPage) || (showAlbum && currentAlbumPhoto) ? "award-active" : ""}`}
+      className={`signage ${content?.theme === "mint" ? "mint" : ""} ${(showAward && currentAwardPage && currentAwardActive) || (showAlbum && currentAlbumPhoto && currentAlbumActive) ? "award-active" : ""}`}
     >
       <header className="display-header">
         <div className="brand">
@@ -605,23 +802,34 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
         <aside className="display-aside">
           <div
             className="poster-card"
-            onMouseEnter={() => setPaused(true)}
-            onMouseLeave={() => setPaused(false)}
+            onMouseEnter={mode === "screen" ? undefined : () => setPaused(true)}
+            onMouseLeave={
+              mode === "screen" ? undefined : () => setPaused(false)
+            }
           >
             {poster ? (
               <>
                 <PosterArtwork poster={poster} />
                 <div className="poster-dots">
-                  {posters.map((p, i) => (
-                    <button
-                      key={p.id}
-                      aria-label={`第 ${i + 1} 張海報`}
-                      className={
-                        i === posterIndex % posters.length ? "active" : ""
-                      }
-                      onClick={() => setPosterIndex(i)}
-                    />
-                  ))}
+                  {posters.map((p, i) =>
+                    mode === "screen" ? (
+                      <span
+                        key={p.id}
+                        className={
+                          i === posterIndex % posters.length ? "active" : ""
+                        }
+                      />
+                    ) : (
+                      <button
+                        key={p.id}
+                        aria-label={`第 ${i + 1} 張海報`}
+                        className={
+                          i === posterIndex % posters.length ? "active" : ""
+                        }
+                        onClick={() => setPosterIndex(i)}
+                      />
+                    ),
+                  )}
                 </div>
               </>
             ) : (
@@ -672,15 +880,17 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
           <small>MUSIC & EVERYDAY</small>
         </span>
       </footer>
-      {showAward && currentAwardPage && (
+      {showAward && currentAwardPage && currentAwardActive && (
         <AwardDisplay
           {...currentAwardPage}
           fading={awardFading}
           schoolName={content?.schoolName ?? "梯梯塔音樂坊"}
           logo={content?.logo}
+          paused={paused}
+          reducedMotion={reducedMotion}
         />
       )}
-      {showAlbum && currentAlbum && currentAlbumPhoto && (
+      {showAlbum && currentAlbum && currentAlbumPhoto && currentAlbumActive && (
         <AlbumDisplay
           album={currentAlbum}
           photo={currentAlbumPhoto}
@@ -690,26 +900,28 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
           schoolName={content?.schoolName ?? "梯梯塔音樂坊"}
         />
       )}
-      <div className="display-controls">
-        <button
-          aria-label={paused ? "繼續輪播" : "暫停輪播"}
-          onClick={() => setPaused((p) => !p)}
-        >
-          {paused ? <Play size={16} /> : <Pause size={16} />}
-        </button>
-        <button
-          aria-label="全螢幕"
-          onClick={() => {
-            if (document.fullscreenElement) void document.exitFullscreen();
-            else void document.documentElement.requestFullscreen();
-          }}
-        >
-          <Maximize2 size={16} />
-        </button>
-        <a href="/admin" aria-label="管理後台">
-          CMS
-        </a>
-      </div>
+      {mode !== "screen" && (
+        <div className="display-controls">
+          <button
+            aria-label={paused ? "繼續輪播" : "暫停輪播"}
+            onClick={() => setPaused((p) => !p)}
+          >
+            {paused ? <Play size={16} /> : <Pause size={16} />}
+          </button>
+          <button
+            aria-label="全螢幕"
+            onClick={() => {
+              if (document.fullscreenElement) void document.exitFullscreen();
+              else void document.documentElement.requestFullscreen();
+            }}
+          >
+            <Maximize2 size={16} />
+          </button>
+          <a href="/admin" aria-label="管理後台">
+            CMS
+          </a>
+        </div>
+      )}
     </main>
   );
 }

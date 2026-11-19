@@ -82,7 +82,10 @@ export const contentSchema = z
             sharedPrize: text(80),
             image: z.union([z.literal(""), localImage]),
             enabled: z.boolean(),
-            duration: z.number().int().min(10).max(60),
+            duration: z.number().int().min(5).max(60),
+            effect: z.enum(["classic", "spotlight", "reveal"]).optional(),
+            playbackMode: z.enum(["continuous", "segmented"]).optional(),
+            segmentDuration: z.number().int().min(15).max(180).optional(),
             ...windowFields,
             recipients: z
               .array(

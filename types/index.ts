@@ -29,6 +29,9 @@ export interface Award {
   image: string;
   enabled: boolean;
   duration: number;
+  effect?: "classic" | "spotlight" | "reveal";
+  playbackMode?: "continuous" | "segmented";
+  segmentDuration?: number;
   startsAt: string;
   endsAt: string;
   recipients: AwardRecipient[];

@@ -38,7 +38,9 @@ test("independent CMS: login, draft, publication, pairing, revocation, responsiv
   expect((await request.get("/api/admin/content")).status()).toBe(401);
   expect((await request.get("/api/display")).status()).toBe(401);
   await page.goto("/demo");
-  await expect(page.getByRole("heading", { name: "今日課程" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "今日課程", level: 1 }),
+  ).toBeVisible();
   await page.screenshot({
     path: "test-results/lobby-desktop.png",
     fullPage: true,
@@ -201,10 +203,14 @@ test("independent CMS: login, draft, publication, pairing, revocation, responsiv
     )
     .toBe(true);
   await screen.reload();
-  await expect(screen.getByRole("heading", { name: "今日課程" })).toBeVisible();
+  await expect(
+    screen.getByRole("heading", { name: "今日課程", level: 1 }),
+  ).toBeVisible();
   await device.setOffline(true);
   await screen.reload();
-  await expect(screen.getByRole("heading", { name: "今日課程" })).toBeVisible();
+  await expect(
+    screen.getByRole("heading", { name: "今日課程", level: 1 }),
+  ).toBeVisible();
   await screen.screenshot({
     path: "test-results/lobby-offline.png",
     fullPage: true,
@@ -239,7 +245,9 @@ test("independent CMS: login, draft, publication, pairing, revocation, responsiv
     ).ok(),
   ).toBe(true);
   await screen.reload();
-  await expect(screen.getByRole("heading", { name: "今日課程" })).toBeVisible();
+  await expect(
+    screen.getByRole("heading", { name: "今日課程", level: 1 }),
+  ).toBeVisible();
   await page.reload();
   await page.getByRole("button", { name: "螢幕管理", exact: true }).click();
   page.once("dialog", (dialog) => dialog.accept());
@@ -340,7 +348,9 @@ test("screen can pair through another NAS address without weakening admin origin
   await page.getByLabel("螢幕顯示的配對碼").fill(code);
   await page.getByRole("button", { name: "配對螢幕", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("配對成功");
-  await expect(screen.getByRole("heading", { name: "今日課程" })).toBeVisible({
+  await expect(
+    screen.getByRole("heading", { name: "今日課程", level: 1 }),
+  ).toBeVisible({
     timeout: 15000,
   });
   const crossOrigin = await screenContext.request.post(
@@ -349,4 +359,53 @@ test("screen can pair through another NAS address without weakening admin origin
   );
   expect(crossOrigin.status()).toBe(403);
   await screenContext.close();
+});
+
+test("award animation and playback choices survive saving and reloading the CMS", async ({
+  page,
+}) => {
+  const env = await readFile(".env.local", "utf8");
+  const password = env
+    .match(
+      /Initial login password; remove this comment after storing it securely: (.+)/,
+    )?.[1]
+    ?.trim();
+  expect(password).toBeTruthy();
+  await page.goto("/login");
+  await page.getByLabel("密碼", { exact: true }).fill(password!);
+  await page.getByRole("button", { name: "進入管理後台" }).click();
+  await page.getByRole("button", { name: "榮耀時刻", exact: true }).click();
+  await page.getByRole("button", { name: "＋ 新增獲獎紀錄" }).click();
+  await page.getByLabel("呈現版型").selectOption("competition");
+  await page.getByLabel("比賽名稱").fill("測試同場多獎音樂大賽");
+  await page.getByLabel("學生顯示名稱").fill("測試同學");
+  await page.getByLabel("組別", { exact: true }).fill("鋼琴組");
+  await page.getByLabel("獎項", { exact: true }).fill("特優獎");
+  await page.getByLabel("動畫效果").selectOption("reveal");
+  await expect(page.getByLabel("每頁播放秒數（5–60）")).toHaveValue("9");
+  await page.getByLabel("同場播放方式").selectOption("continuous");
+  await expect(
+    page.getByRole("spinbutton", { name: /每段目標秒數/ }),
+  ).toHaveCount(0);
+  await page.getByLabel("同場播放方式").selectOption("segmented");
+  await page.getByRole("spinbutton", { name: /每段目標秒數/ }).fill("30");
+  await page.getByLabel("啟用播放", { exact: true }).check();
+  await page.getByRole("button", { name: /儲存草稿/ }).click();
+  await expect(page.getByRole("status")).toHaveText("草稿已儲存");
+  await page.reload();
+  await page.getByRole("button", { name: "榮耀時刻", exact: true }).click();
+  await expect(page.getByLabel("動畫效果")).toHaveValue("reveal");
+  await expect(page.getByLabel("同場播放方式")).toHaveValue("segmented");
+  await expect(
+    page.getByRole("spinbutton", { name: /每段目標秒數/ }),
+  ).toHaveValue("30");
+  const state = (await (await page.request.get("/api/admin/content")).json())
+    .data;
+  expect(state.draft.awards[0]).toMatchObject({
+    effect: "reveal",
+    playbackMode: "segmented",
+    segmentDuration: 30,
+    duration: 9,
+    enabled: true,
+  });
 });
