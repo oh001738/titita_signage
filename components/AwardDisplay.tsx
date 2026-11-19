@@ -127,6 +127,7 @@ export function AwardDisplay({
       data-effect={effect}
       data-page={page}
       data-award-id={award.id}
+      data-exiting={fading}
     >
       <div className={styles.beam} aria-hidden="true" />
       <div className={styles.floorGlow} aria-hidden="true" />
@@ -200,6 +201,7 @@ export function AwardDisplay({
             <div
               className={`${styles.cards} ${compactCards ? styles.compactCards : ""}`}
               data-compact={compactCards}
+              data-count={recipients.length}
             >
               {recipients.map((person, index) => (
                 <article

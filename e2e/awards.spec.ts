@@ -85,6 +85,38 @@ async function openPlayer(
 const awardScreen = (page: Page) =>
   page.getByLabel("榮耀時刻", { exact: true });
 
+test("award surface stays opaque during transitions and a single remaining student is centered", async ({
+  page,
+}) => {
+  await openPlayer(page, award(1), { logo: "/school-logo-trial.png" });
+  await page.clock.runFor(40_000);
+  await expectStudents(page, [1]);
+  const screen = awardScreen(page);
+  expect(await screen.evaluate((node) => getComputedStyle(node).opacity)).toBe(
+    "1",
+  );
+  expect(
+    await screen.evaluate((node) => getComputedStyle(node).backgroundColor),
+  ).toBe("rgb(250, 247, 239)");
+  // Measure the settled layout, independent of the card's 3D entry transform.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const card = await screen.locator("[data-recipient-id]").boundingBox();
+  expect(Math.abs(card!.x + card!.width / 2 - 800)).toBeLessThan(2);
+  const logo = screen.getByRole("img", { name: "TITITA 音樂教室" });
+  expect(
+    await logo.evaluate((node) => getComputedStyle(node).backgroundColor),
+  ).toBe("rgba(0, 0, 0, 0)");
+  await page.screenshot({
+    path: "test-results/awards-cream-single-student.png",
+    animations: "disabled",
+  });
+  await page.clock.runFor(5_000);
+  await expect(screen).toHaveAttribute("data-exiting", "true");
+  expect(await screen.evaluate((node) => getComputedStyle(node).opacity)).toBe(
+    "1",
+  );
+});
+
 async function expectStudents(page: Page, expected: number[]) {
   await expect(awardScreen(page)).toBeVisible();
   await expect

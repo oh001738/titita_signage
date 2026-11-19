@@ -1,10 +1,10 @@
 .stage.stage {
-  --stage: #132d28;
-  --paper: #faf4e5;
-  --gold: #efd093;
-  --dim: #c0ccba;
-  --panel: #244139;
-  --edge: #506249;
+  --stage: #faf7ef;
+  --paper: #183e38;
+  --gold: #99622f;
+  --dim: #657060;
+  --panel: #fffdf8;
+  --edge: #ded8c5;
   isolation: isolate;
   display: flex;
   flex-direction: column;
@@ -13,6 +13,13 @@
   background: var(--stage);
   color: var(--paper);
   overflow: hidden;
+  /* Keep the surface opaque throughout transitions; animate only its content. */
+  opacity: 1;
+  animation: none;
+}
+
+.stage[data-exiting="true"] .body {
+  animation: detail-enter 0.3s ease-in reverse both;
 }
 
 .stage :is(h1, h2, p) {
@@ -27,6 +34,7 @@
 }
 
 .beam {
+  opacity: 0.25;
   width: 90%;
   height: 115%;
   top: -35%;
@@ -46,6 +54,7 @@
 }
 
 .floorGlow {
+  opacity: 0.25;
   inset: 30% -25% -35%;
   background: radial-gradient(ellipse at 50% 80%, #b9a35e30, transparent 60%);
 }
@@ -83,11 +92,10 @@
   flex: 0 1 auto;
   width: min(25vw, 420px);
   height: 8vh;
-  padding: 0.6vh 0.6vw;
+  padding: 0;
   object-fit: contain;
   object-position: left center;
-  background: var(--paper);
-  border-radius: 8px;
+  background: transparent;
 }
 
 .event {
@@ -244,6 +252,18 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.5vw;
   perspective: 1100px;
+}
+
+.cards[data-count="1"] {
+  grid-template-columns: minmax(0, 1fr);
+  width: min(100%, 54vw);
+  margin: 0 auto;
+}
+
+.cards[data-count="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(100%, 76vw);
+  margin: 0 auto;
 }
 
 .card {
@@ -524,8 +544,11 @@
     margin-bottom: 14px;
   }
 
-  .cards {
+  .cards,
+  .cards[data-count="1"],
+  .cards[data-count="2"] {
     grid-template-columns: minmax(0, 1fr);
+    width: 100%;
     gap: 12px;
   }
 
