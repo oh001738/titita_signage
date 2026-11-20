@@ -1,6 +1,9 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { defaultContent } from "../lib/defaults";
+import type { DisplayPayload, WeatherKind } from "../types";
+
+test.use({ serviceWorkers: "block" });
 test("weather settings load locations, test without saving, and retain edits across navigation", async ({
   page,
   request,
@@ -78,52 +81,77 @@ test("weather settings load locations, test without saving, and retain edits acr
     fullPage: true,
   });
 });
-test("animated forecast fits the footer and expires safely", async ({
-  page,
-}) => {
-  const env = await readFile(".env.local", "utf8");
-  const password = env
-    .match(
-      /Initial login password; remove this comment after storing it securely: (.+)/,
-    )?.[1]
-    ?.trim();
-  await page.goto("/login");
-  await page.getByLabel("密碼", { exact: true }).fill(password!);
-  await page.getByRole("button", { name: "進入管理後台" }).click();
-  await page.waitForURL("**/admin");
-  await page.clock.install();
-  let kind = "sun";
-  const validUntil = new Date(Date.now() + 300000).toISOString();
-  await page.route("**/api/admin/preview?*", async (route) =>
+function weatherPayload(time: Date): DisplayPayload {
+  const content = defaultContent();
+  content.awards = [];
+  content.albums = [];
+  content.announcements[0].body =
+    "週六成果發表會開放報名，歡迎洽詢櫃台。".repeat(6);
+  return {
+    content,
+    version: 1,
+    serverTime: time.toISOString(),
+    schedule: {
+      date: "2026-11-20",
+      fetchedAt: time.toISOString(),
+      source: "mock",
+      stale: false,
+      error: null,
+      lessons: Array.from({ length: 8 }, (_, i) => ({
+        id: `weather-lesson-${i}`,
+        date: "2026-11-20",
+        start_time: "16:20",
+        end_time: "17:20",
+        course_name: [
+          "林小樂（小提琴個別課）",
+          "陳小安（鋼琴）",
+          "王小美（大提琴個別課）",
+          "黃小明（長笛）",
+        ][i % 4],
+        teacher_name: "王老師",
+        room_id: "room",
+        room_name: ["1F-大團體教室", "1琴房", "4琴房", "1F-小團體教室"][i % 4],
+        status: "scheduled",
+      })),
+    },
+    weather: {
+      township: "臺東市",
+      status: "ready",
+      kind: "partly",
+      description: "晴時多雲",
+      temperature: 23,
+      rainProbability: 30,
+      validUntil: new Date(time.getTime() + 5 * 60000).toISOString(),
+    },
+  };
+}
+
+async function mockDisplay(page: Page, payload: DisplayPayload) {
+  await page.route("**/api/display", (route) =>
+    route.fulfill({ json: { data: payload, error: null } }),
+  );
+  await page.route("**/api/sync-time", (route) =>
     route.fulfill({
       json: {
-        error: null,
         data: {
-          content: { ...defaultContent(), awards: [], albums: [] },
-          version: 1,
-          schedule: {
-            date: "2026-11-20",
-            fetchedAt: null,
-            source: "mock",
-            stale: false,
-            lessons: [],
-            error: null,
-          },
-          serverTime: new Date().toISOString(),
-          weather: {
-            township: "臺東市",
-            status: "ready",
-            kind,
-            description: "多雲短暫雨",
-            temperature: 23,
-            rainProbability: 30,
-            validUntil,
-          },
+          receivedAt: Date.parse(payload.serverTime),
+          sentAt: Date.parse(payload.serverTime),
         },
+        error: null,
       },
     }),
   );
-  for (kind of [
+}
+
+test("soft weather artwork changes by forecast and night, honors reduced motion, and expires safely", async ({
+  page,
+}) => {
+  const now = new Date("2026-11-20T16:30:00+08:00");
+  await page.clock.install({ time: now });
+  await page.clock.pauseAt(new Date(now.getTime() + 100));
+  const payload = weatherPayload(now);
+  await mockDisplay(page, payload);
+  const kinds: WeatherKind[] = [
     "sun",
     "partly",
     "cloud",
@@ -132,27 +160,225 @@ test("animated forecast fits the footer and expires safely", async ({
     "wind",
     "fog",
     "snow",
-  ]) {
-    await page.goto("/admin/preview?player=1");
+  ];
+  for (const kind of kinds) {
+    payload.weather!.kind = kind;
+    await page.goto("/display");
     const widget = page.locator(`[data-weather="${kind}"]`);
     await expect(widget).toBeVisible();
-    await expect(widget).toContainText("23°");
+    await expect(widget.locator("[data-weather-scene]")).toBeVisible();
+    await expect(widget.locator("[data-weather-temperature]")).toContainText(
+      "23",
+    );
+    await expect(widget).toHaveAttribute("data-weather-night", "false");
+  }
+  const night = new Date("2026-11-20T20:30:00+08:00");
+  await page.clock.setSystemTime(night);
+  payload.serverTime = night.toISOString();
+  payload.weather!.validUntil = new Date(
+    night.getTime() + 5 * 60000,
+  ).toISOString();
+  for (const kind of ["sun", "partly"] as const) {
+    payload.weather!.kind = kind;
+    await page.goto("/display");
+    const widget = page.locator(`[data-weather="${kind}"]`);
+    await expect(widget).toHaveAttribute("data-weather-night", "true");
+    await expect(widget).toHaveAttribute(
+      "data-icon",
+      kind === "sun" ? "night" : "night-cloud",
+    );
+  }
+  const widget = page.locator("[data-weather]");
+  const motions = widget.locator("[data-weather-motion]");
+  expect(await motions.count()).toBeGreaterThan(0);
+  expect(
+    await motions.evaluateAll((nodes) =>
+      nodes.some((node) => getComputedStyle(node).animationName !== "none"),
+    ),
+  ).toBe(true);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(
+    await motions.evaluateAll((nodes) =>
+      nodes.every((node) =>
+        [node, ...node.querySelectorAll("*")].every(
+          (element) => getComputedStyle(element).animationName === "none",
+        ),
+      ),
+    ),
+  ).toBe(true);
+  await page.clock.fastForward(6 * 60000);
+  await expect(page.locator('[data-weather="loading"]')).toContainText(
+    "天氣更新中",
+  );
+  await expect(page.locator("[data-weather-temperature]")).not.toContainText(
+    "23",
+  );
+});
+
+for (const viewport of [
+  { width: 1920, height: 1080 },
+  { width: 1280, height: 720 },
+  { width: 390, height: 844 },
+]) {
+  test(`large weather card and announcement coexist with four lessons at ${viewport.width}x${viewport.height}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const now = new Date("2026-11-20T16:30:00+08:00");
+    await page.clock.install({ time: now });
+    await page.clock.pauseAt(new Date(now.getTime() + 100));
+    const payload = weatherPayload(now);
+    await mockDisplay(page, payload);
+    await page.goto("/display");
+    const widget = page.locator('[data-weather="partly"]');
+    await expect(widget).toBeVisible();
+    const rows = page.locator(".lesson-row");
+    await expect(rows).toHaveCount(4);
+    for (const row of await rows.all()) {
+      const bounds = (await row.boundingBox())!;
+      const teacher = (await row
+        .locator(".lesson-course > span")
+        .boundingBox())!;
+      const room = (await row.locator(".lesson-room").boundingBox())!;
+      const status = (await row.locator(".lesson-status").boundingBox())!;
+      expect(teacher.y).toBeGreaterThanOrEqual(bounds.y);
+      expect(teacher.y + teacher.height).toBeLessThanOrEqual(
+        bounds.y + bounds.height + 1,
+      );
+      expect(room.x + room.width).toBeLessThan(status.x);
+    }
+    const cardBox = (await widget.boundingBox())!;
+    for (const hook of ["location", "temperature", "description", "precip"]) {
+      const text = widget.locator(`[data-weather-${hook}]`);
+      const box = (await text.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(cardBox.x);
+      expect(box.x + box.width).toBeLessThanOrEqual(
+        cardBox.x + cardBox.width + 1,
+      );
+      expect(box.y + box.height).toBeLessThanOrEqual(
+        cardBox.y + cardBox.height + 1,
+      );
+    }
+    const notice = page.locator(".announcement-bar");
+    const marquee = page.locator(".announcement-text");
+    await expect(marquee.locator("span")).toHaveText(
+      payload.content.announcements[0].body,
+    );
+    if (viewport.width > 800) {
+      const tableBox = (await page.locator(".schedule-table").boundingBox())!;
+      const noticeBox = (await notice.boundingBox())!;
+      const marqueeBox = (await marquee.boundingBox())!;
+      expect(tableBox.y + tableBox.height).toBeLessThan(noticeBox.y);
+      expect(noticeBox.y + noticeBox.height).toBeLessThanOrEqual(
+        viewport.height + 1,
+      );
+      expect(marqueeBox.x + marqueeBox.width).toBeLessThan(cardBox.x);
+      expect(marqueeBox.width).toBeGreaterThan(viewport.width * 0.28);
+      const minSizes =
+        viewport.width >= 1900
+          ? { location: 28, temperature: 52, description: 24, precip: 24 }
+          : { location: 20, temperature: 36, description: 18, precip: 18 };
+      for (const [hook, min] of Object.entries(minSizes)) {
+        const size = await widget
+          .locator(`[data-weather-${hook}]`)
+          .evaluate((node) => parseFloat(getComputedStyle(node).fontSize));
+        expect(size).toBeGreaterThanOrEqual(min);
+      }
+    }
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-  }
-  await page.screenshot({ path: "test-results/weather-display.png" });
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  expect(
-    await page
-      .locator("[data-weather] svg")
-      .first()
-      .evaluate((el) => getComputedStyle(el).animationName),
-  ).toBe("none");
-  await page.clock.fastForward(6 * 60000);
-  await expect(page.locator('[data-weather="loading"]')).toContainText(
-    "天氣更新中",
-  );
-});
+    await page.screenshot({
+      path: `test-results/soft-weather-${viewport.width}.png`,
+      animations: "disabled",
+      fullPage: viewport.width < 800,
+    });
+  });
+}
+
+for (const interlude of ["award", "album"] as const) {
+  test(`large weather footer does not cover the ${interlude} interlude`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const now = new Date("2026-11-20T16:30:00+08:00");
+    await page.clock.install({ time: now });
+    await page.clock.pauseAt(new Date(now.getTime() + 100));
+    const payload = weatherPayload(now);
+    if (interlude === "award") {
+      payload.content.awards = [
+        {
+          id: "weather-award",
+          layout: "competition",
+          competition: "兒童音樂比賽",
+          sharedPrize: "",
+          image: "",
+          enabled: true,
+          duration: 10,
+          effect: "reveal",
+          playbackMode: "continuous",
+          startsAt: "",
+          endsAt: "",
+          recipients: ["林小樂", "陳小安", "王小美"].map((name, index) => ({
+            id: `weather-award-student-${index}`,
+            name,
+            category: "鋼琴",
+            prize: "優等獎",
+          })),
+        },
+      ];
+    } else {
+      payload.content.albums = [
+        {
+          id: "weather-album",
+          title: "音樂成果發表會",
+          date: "2026-11-20",
+          description: "",
+          enabled: true,
+          startsAt: "",
+          endsAt: "",
+          duration: 20,
+          batchSize: 1,
+          fit: "contain",
+          photos: [
+            {
+              id: "weather-album-photo",
+              image: "/concert-art.png",
+              caption: "一起演奏的美好時刻",
+              selected: true,
+            },
+          ],
+        },
+      ];
+    }
+    await mockDisplay(page, payload);
+    await page.goto("/display");
+    await expect(page.locator('[data-weather="partly"]')).toBeVisible();
+    await page.clock.runFor(40_000);
+    const screen = page.getByLabel(
+      interlude === "award" ? "榮耀時刻" : "活動相簿",
+      { exact: true },
+    );
+    await expect(screen).toBeVisible();
+    const footer = (await page.locator(".announcement-bar").boundingBox())!;
+    const importantContent = screen.locator(
+      interlude === "award"
+        ? "[data-recipient-id]"
+        : ".activity-image-frame, .activity-caption",
+    );
+    expect(await importantContent.count()).toBeGreaterThan(0);
+    for (const element of await importantContent.all()) {
+      const box = (await element.boundingBox())!;
+      expect(box.y + box.height).toBeLessThanOrEqual(footer.y + 1);
+    }
+    await expect(page.locator('[data-weather="partly"]')).toBeVisible();
+    await page.screenshot({
+      path: `test-results/soft-weather-${interlude}.png`,
+      animations: "disabled",
+    });
+  });
+}

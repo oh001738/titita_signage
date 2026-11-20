@@ -9,7 +9,7 @@
   display: flex;
   flex-direction: column;
   gap: 2.2vh;
-  padding: 3vh 4vw calc(12.1vh + 12px);
+  padding: 3vh 4vw calc(var(--announcement-height, 10vh) + 2.1vh + 12px);
   background: var(--stage);
   color: var(--paper);
   overflow: hidden;

@@ -152,10 +152,26 @@ export function Display({
   previewSource?: "draft" | "published";
 }) {
   const [payload, setPayload] = useState<DisplayPayload | null>(null);
+  const signageRef = useRef<HTMLElement>(null);
+  const footerRef = useRef<HTMLElement>(null);
   const [now, setNow] = useState(new Date());
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState("");
   const [pairRequired, setPairRequired] = useState(false);
+  useEffect(() => {
+    const signage = signageRef.current;
+    const footer = footerRef.current;
+    if (!signage || !footer) return;
+    const measure = () =>
+      signage.style.setProperty(
+        "--announcement-height",
+        `${Math.ceil(footer.getBoundingClientRect().height)}px`,
+      );
+    const observer = new ResizeObserver(measure);
+    observer.observe(footer);
+    measure();
+    return () => observer.disconnect();
+  }, [payload !== null, pairRequired]);
   const [pairCode, setPairCode] = useState("");
   const [noticeIndex, setNoticeIndex] = useState(0);
   const [posterIndex, setPosterIndex] = useState(0);
@@ -697,6 +713,8 @@ export function Display({
     );
   return (
     <main
+      ref={signageRef}
+      data-weather-enabled={Boolean(payload?.weather)}
       className={`signage ${content?.theme === "mint" ? "mint" : ""} ${(showAward && currentAwardPage && currentAwardActive) || (showAlbum && currentAlbumPhoto && currentAlbumActive) ? "award-active" : ""}`}
     >
       <header className="display-header">
@@ -891,7 +909,10 @@ export function Display({
           </div>
         </aside>
       </div>
-      <footer className={`announcement-bar ${urgent ? "urgent" : ""}`}>
+      <footer
+        ref={footerRef}
+        className={`announcement-bar ${urgent ? "urgent" : ""}`}
+      >
         <div className="announcement-label">
           <Bell size={23} />
           {notice?.title || "教室公告"}

@@ -212,6 +212,21 @@ p {
   --cream: #f1f8f1;
   background-color: var(--cream);
 }
+/* Recover vertical space for four readable lesson rows beside the taller card. */
+@media (min-width: 801px) {
+  .signage[data-weather-enabled="true"] .display-header {
+    height: 12vh;
+  }
+  .signage[data-weather-enabled="true"] .display-main {
+    padding: 1.5vh 0 1.2vh;
+  }
+  .signage[data-weather-enabled="true"] .schedule-heading {
+    margin-bottom: 1vh;
+  }
+  .signage[data-weather-enabled="true"] .schedule-bottom {
+    padding: 0.8vh 0.5vw;
+  }
+}
 .display-header {
   height: 15vh;
   min-height: 80px;
@@ -2203,7 +2218,7 @@ p {
 .award-display {
   display: flex;
   flex-direction: column;
-  padding-bottom: calc(12.1vh + 12px);
+  padding-bottom: calc(var(--announcement-height, 10vh) + 2.1vh + 12px);
 }
 .award-display-main {
   flex: 1;
@@ -2212,7 +2227,7 @@ p {
 }
 @media (max-width: 800px) {
   .award-display {
-    padding-bottom: calc(2.1vh + max(10vh, 100px) + 12px);
+    padding-bottom: calc(var(--announcement-height, 100px) + 24px + 12px);
   }
 }
 
@@ -2231,7 +2246,7 @@ p {
     bottom: 24px;
   }
   .award-display {
-    padding-bottom: calc(124px + 2vh);
+    padding-bottom: calc(var(--announcement-height, 100px) + 24px + 12px);
   }
 }
 
@@ -2384,7 +2399,7 @@ p {
   position: fixed;
   inset: 0;
   z-index: 20;
-  padding: 2.5vh 2.5vw calc(12.1vh + 12px);
+  padding: 2.5vh 2.5vw calc(var(--announcement-height, 10vh) + 2.1vh + 12px);
   background: #f9f6ef;
   animation: signage-fade-in 0.5s ease both;
 }
@@ -2451,7 +2466,7 @@ p {
 }
 @media (max-width: 800px) {
   .activity-display {
-    padding-bottom: calc(124px + 2vh);
+    padding-bottom: calc(var(--announcement-height, 100px) + 24px + 12px);
   }
 }
 @media (prefers-reduced-motion: reduce) {
