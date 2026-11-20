@@ -633,7 +633,7 @@ p {
   gap: 1.8vw;
   background: #f5e9d6;
   border-radius: 16px;
-  padding: 0.5vh 1.25vw;
+  padding: clamp(4px, 0.5vh, 6px) 1.25vw;
   flex-shrink: 0;
 }
 @media (min-width: 801px) {
