@@ -118,6 +118,7 @@ function AnnouncementText({ body, paused }: { body: string; paused: boolean }) {
     measure();
     const observer = new ResizeObserver(measure);
     if (container.current) observer.observe(container.current);
+    if (text.current) observer.observe(text.current);
     return () => observer.disconnect();
   }, [body]);
   const isOverflowing = widths.text > widths.container;

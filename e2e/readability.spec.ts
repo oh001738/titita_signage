@@ -86,4 +86,73 @@ for (const viewport of [
       animations: "disabled",
     });
   });
+
+  test(`larger announcement label and marquee fit at ${viewport.width}x${viewport.height}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    const now = new Date("2026-11-20T16:30:00+08:00");
+    const content = defaultContent();
+    content.announcements[0].body =
+      "週六成果發表會開放報名，歡迎洽詢櫃台。".repeat(8);
+    const payload: DisplayPayload = {
+      content,
+      version: 1,
+      serverTime: now.toISOString(),
+      schedule: {
+        date: "2026-11-20",
+        fetchedAt: now.toISOString(),
+        source: "mock",
+        stale: false,
+        error: null,
+        lessons: [],
+      },
+    };
+    await page.clock.install({ time: now });
+    await page.clock.pauseAt(new Date(now.getTime() + 100));
+    await page.route("**/api/display", (route) =>
+      route.fulfill({ json: { data: payload, error: null } }),
+    );
+    await page.route("**/api/sync-time", (route) =>
+      route.fulfill({
+        json: {
+          data: { receivedAt: now.getTime(), sentAt: now.getTime() },
+          error: null,
+        },
+      }),
+    );
+    await page.goto("/display");
+    const label = page.locator(".announcement-label");
+    const text = page.locator(".announcement-text");
+    await expect(label).toHaveText("教室公告");
+    await expect(text.locator("span")).toHaveClass("announcement-scroll");
+    expect(
+      await label.evaluate((node) => node.scrollWidth <= node.clientWidth),
+    ).toBe(true);
+    const labelSize = await label.evaluate((node) =>
+      parseFloat(getComputedStyle(node).fontSize),
+    );
+    const bodySize = await text.evaluate((node) =>
+      parseFloat(getComputedStyle(node).fontSize),
+    );
+    expect(labelSize).toBeGreaterThanOrEqual(
+      viewport.width >= 1900 ? 30 : viewport.width >= 1200 ? 20 : 16,
+    );
+    expect(bodySize).toBeGreaterThanOrEqual(
+      viewport.width >= 1900 ? 34 : viewport.width >= 1200 ? 23 : 16,
+    );
+    const bar = await page.locator(".announcement-bar").boundingBox();
+    const textBox = await text.boundingBox();
+    expect(textBox!.y).toBeGreaterThanOrEqual(bar!.y);
+    expect(textBox!.y + textBox!.height).toBeLessThanOrEqual(
+      bar!.y + bar!.height,
+    );
+    if (viewport.width > 800)
+      expect(bar!.y + bar!.height).toBeLessThanOrEqual(viewport.height);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  });
 }
