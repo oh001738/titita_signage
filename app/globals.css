@@ -2490,3 +2490,17 @@ p {
   border-radius: 8px;
   text-decoration: none;
 }
+/* Keep weather credentials in an independent settings form. */
+.weather-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.weather-fields > label {
+  display: grid;
+  gap: 8px;
+}
+.heading-actions[hidden] {
+  display: none;
+}

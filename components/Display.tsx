@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { WeatherWidget } from "@/components/WeatherWidget";
 import {
   Bell,
   Music2,
@@ -899,11 +900,7 @@ export function Display({
           body={notice?.body || "歡迎來到音樂的日常。"}
           paused={paused}
         />
-        <span className="footer-brand">
-          TITITA
-          <br />
-          <small>MUSIC & EVERYDAY</small>
-        </span>
+        <WeatherWidget weather={payload?.weather} />
       </footer>
       {showAward && currentAwardPage && currentAwardActive && (
         <AwardDisplay

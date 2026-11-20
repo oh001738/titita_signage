@@ -4,6 +4,7 @@ import { fail, ok } from "@/lib/http";
 import { fetchSchedule } from "@/lib/main-system-client";
 import { mutateState, readState } from "@/lib/store";
 import { maybeCleanupAlbumTrash } from "@/lib/album-trash";
+import { displayWeather } from "@/lib/weather";
 export const dynamic = "force-dynamic";
 export async function GET() {
   try {
@@ -17,7 +18,10 @@ export async function GET() {
     if (!state.published)
       throw new HttpError(404, "尚未發布內容，請至管理後台發布");
     await maybeCleanupAlbumTrash().catch(() => undefined);
-    const schedule = await fetchSchedule();
+    const [schedule, weather] = await Promise.all([
+      fetchSchedule(),
+      displayWeather(state),
+    ]);
     if (
       !screen.lastSeen ||
       Date.now() - Date.parse(screen.lastSeen) > 60_000 ||
@@ -35,6 +39,7 @@ export async function GET() {
       content: state.published.content,
       version: state.published.version,
       schedule,
+      weather,
       serverTime: new Date().toISOString(),
     });
   } catch (e) {

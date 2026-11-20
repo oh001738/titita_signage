@@ -109,6 +109,12 @@ export interface PendingPairing {
   expiresAt: string;
 }
 export interface CmsState {
+  weather?: {
+    revision: number;
+    county: string;
+    township: string;
+    encryptedKey?: string;
+  };
   revision: number;
   contentRevision: number;
   draft: Content;
@@ -142,10 +148,22 @@ export interface Schedule {
   error: string | null;
 }
 export interface DisplayPayload {
+  weather?: DisplayWeather | null;
   content: Content;
   version: number;
   schedule: Schedule;
   serverTime: string;
+}
+export type WeatherKind =
+  "sun" | "partly" | "cloud" | "rain" | "thunder" | "wind" | "fog" | "snow";
+export interface DisplayWeather {
+  township: string;
+  status: "ready" | "unavailable";
+  kind?: WeatherKind;
+  description?: string;
+  temperature?: number;
+  rainProbability?: number;
+  validUntil?: string;
 }
 export interface ApiResponse<T> {
   data: T | null;

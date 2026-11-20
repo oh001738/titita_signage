@@ -27,6 +27,7 @@ import type { Content, Publication, Screen, AlbumTrashItem } from "@/types";
 import { createContentId } from "@/lib/content-id";
 import { AwardsEditor } from "@/components/AwardsEditor";
 import { AlbumsEditor } from "@/components/AlbumsEditor";
+import { WeatherSettings } from "@/components/WeatherSettings";
 type Section =
   | "overview"
   | "announcements"
@@ -34,6 +35,7 @@ type Section =
   | "awards"
   | "albums"
   | "settings"
+  | "weather"
   | "screens";
 interface EditorState {
   revision: number;
@@ -49,6 +51,7 @@ const navigation = [
   { id: "awards", label: "榮耀時刻", icon: Music2 },
   { id: "albums", label: "活動相簿", icon: Images },
   { id: "settings", label: "畫面與課表", icon: Settings2 },
+  { id: "weather", label: "天氣設定", icon: Settings2 },
   { id: "screens", label: "螢幕管理", icon: Monitor },
 ] as const;
 async function api<T>(url: string, method = "GET", data?: unknown): Promise<T> {
@@ -274,10 +277,12 @@ export function Admin() {
               <p>
                 {section === "overview"
                   ? "編排內容、連結家庭，讓大廳成為音樂日常的起點。"
-                  : "所有變更先儲存為草稿，確認預覽後再發布到螢幕。"}
+                  : section === "weather"
+                    ? "設定天氣地點與氣象署授權碼，使用下方按鈕獨立儲存。"
+                    : "所有變更先儲存為草稿，確認預覽後再發布到螢幕。"}
               </p>
             </div>
-            <div className="heading-actions">
+            <div className="heading-actions" hidden={section === "weather"}>
               <button
                 className="secondary"
                 disabled={isLoading}
@@ -883,6 +888,9 @@ export function Admin() {
               }
             />
           )}
+          <div hidden={section !== "weather"}>
+            <WeatherSettings />
+          </div>
           {section === "settings" && (
             <div className="settings-grid">
               <section className="admin-card editor-card">
