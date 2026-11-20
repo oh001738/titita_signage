@@ -25,19 +25,6 @@ export function WeatherWidget({
       : night && kind === "partly"
         ? "night-cloud"
         : kind;
-  // Keep the complete CWA wording in the accessible label; use concise labels
-  // on the TV so forecast details fit beside the precipitation probability.
-  const caption = {
-    sun: "晴天",
-    partly: "晴時多雲",
-    cloud: weather.description?.includes("陰") ? "陰天" : "多雲",
-    rain: "陣雨",
-    thunder: "雷雨",
-    wind: "有風",
-    fog: "有霧",
-    snow: "下雪",
-    loading: "天氣更新中",
-  }[kind];
   return (
     <div
       className={styles.widget}
@@ -97,9 +84,11 @@ export function WeatherWidget({
             {weather.township}
           </span>
           <div className={styles.details}>
-            <span className={styles.condition} data-weather-description>
-              {caption}
-            </span>
+            {!ready && (
+              <span className={styles.condition} data-weather-description>
+                天氣更新中
+              </span>
+            )}
             <span className={styles.precip} data-weather-precip>
               {ready
                 ? weather.rainProbability !== undefined

@@ -156,19 +156,13 @@ async function expectCenteredTemperature(widget: Locator) {
   const location = (await widget
     .locator("[data-weather-location]")
     .boundingBox())!;
-  const description = (await widget
-    .locator("[data-weather-description]")
-    .boundingBox())!;
   const precipitation = (await widget
     .locator("[data-weather-precip]")
     .boundingBox())!;
-  expect(description.y).toBeGreaterThanOrEqual(
+  expect(precipitation.y).toBeGreaterThanOrEqual(
     location.y + location.height - 1,
   );
-  expect(precipitation.y).toBeGreaterThanOrEqual(
-    description.y + description.height - 1,
-  );
-  for (const box of [location, description, precipitation]) {
+  for (const box of [location, precipitation]) {
     expect(box.x + box.width).toBeLessThanOrEqual(temperature.x);
   }
 }
@@ -272,9 +266,8 @@ for (const viewport of [
     await expect(widget.locator("[data-weather-location]")).toHaveText(
       "臺東市",
     );
-    await expect(widget.locator("[data-weather-description]")).toHaveText(
-      "晴時多雲",
-    );
+    await expect(widget.locator("[data-weather-description]")).toHaveCount(0);
+    await expect(widget).toHaveAttribute("aria-label", /晴時多雲/);
     await expect(widget.locator("[data-weather-precip]")).toHaveText(
       "3小時降雨 30%",
     );
@@ -294,7 +287,8 @@ for (const viewport of [
       expect(room.x + room.width).toBeLessThan(status.x);
     }
     const cardBox = (await widget.boundingBox())!;
-    for (const hook of ["location", "temperature", "description", "precip"]) {
+    if (viewport.width >= 1900) expect(cardBox.width).toBeLessThanOrEqual(405);
+    for (const hook of ["location", "temperature", "precip"]) {
       const text = widget.locator(`[data-weather-${hook}]`);
       const box = (await text.boundingBox())!;
       expect(box.x).toBeGreaterThanOrEqual(cardBox.x);
@@ -325,8 +319,8 @@ for (const viewport of [
       expect(marqueeBox.width).toBeGreaterThan(viewport.width * 0.28);
       const minSizes =
         viewport.width >= 1900
-          ? { location: 28, temperature: 46, description: 22, precip: 22 }
-          : { location: 20, temperature: 34, description: 16, precip: 16 };
+          ? { location: 28, temperature: 46, precip: 22 }
+          : { location: 20, temperature: 34, precip: 16 };
       for (const [hook, min] of Object.entries(minSizes)) {
         const size = await widget
           .locator(`[data-weather-${hook}]`)
@@ -382,7 +376,7 @@ for (const viewport of [
     );
     await expect(widget.locator("[data-weather-precip]")).toContainText("100%");
     await expectCenteredTemperature(widget);
-    for (const hook of ["location", "temperature", "description", "precip"]) {
+    for (const hook of ["location", "temperature", "precip"]) {
       expect(
         await widget
           .locator(`[data-weather-${hook}]`)

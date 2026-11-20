@@ -8,7 +8,7 @@
   display: grid;
   grid-template-columns: clamp(56px, 4.2vw, 88px) minmax(0, 1fr);
   flex-shrink: 0;
-  width: clamp(330px, 25.5vw, 530px);
+  width: clamp(300px, 20.8vw, 440px);
   min-height: clamp(64px, 8.3vh, 90px);
   border-radius: 14px;
   color: #fff;
