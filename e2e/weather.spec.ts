@@ -216,15 +216,20 @@ test("soft weather artwork changes by forecast and night, honors reduced motion,
 });
 
 for (const viewport of [
-  { width: 1920, height: 1080 },
-  { width: 1280, height: 720 },
-  { width: 390, height: 844 },
-]) {
-  test(`large weather card and announcement coexist with four lessons at ${viewport.width}x${viewport.height}`, async ({
+  { width: 1920, height: 1080, motion: "no-preference" },
+  { width: 1920, height: 1080, motion: "reduce" },
+  { width: 1280, height: 720, motion: "no-preference" },
+  { width: 1280, height: 720, motion: "reduce" },
+  { width: 390, height: 844, motion: "reduce" },
+] as const) {
+  test(`compact weather footer and four lessons fit at ${viewport.width}x${viewport.height} with ${viewport.motion}`, async ({
     page,
   }) => {
-    await page.setViewportSize(viewport);
-    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize({
+      width: viewport.width,
+      height: viewport.height,
+    });
+    await page.emulateMedia({ reducedMotion: viewport.motion });
     const now = new Date("2026-11-20T16:30:00+08:00");
     await page.clock.install({ time: now });
     await page.clock.pauseAt(new Date(now.getTime() + 100));
@@ -273,17 +278,32 @@ for (const viewport of [
       expect(noticeBox.y + noticeBox.height).toBeLessThanOrEqual(
         viewport.height + 1,
       );
+      expect(noticeBox.height).toBeLessThanOrEqual(
+        viewport.width >= 1900 ? 110 : 86,
+      );
+      const description = (await widget
+        .locator("[data-weather-description]")
+        .boundingBox())!;
+      const precipitation = (await widget
+        .locator("[data-weather-precip]")
+        .boundingBox())!;
+      expect(Math.abs(description.y - precipitation.y)).toBeLessThanOrEqual(2);
       expect(marqueeBox.x + marqueeBox.width).toBeLessThan(cardBox.x);
       expect(marqueeBox.width).toBeGreaterThan(viewport.width * 0.28);
       const minSizes =
         viewport.width >= 1900
-          ? { location: 28, temperature: 52, description: 24, precip: 24 }
-          : { location: 20, temperature: 36, description: 18, precip: 18 };
+          ? { location: 28, temperature: 46, description: 22, precip: 22 }
+          : { location: 20, temperature: 34, description: 16, precip: 16 };
       for (const [hook, min] of Object.entries(minSizes)) {
         const size = await widget
           .locator(`[data-weather-${hook}]`)
           .evaluate((node) => parseFloat(getComputedStyle(node).fontSize));
         expect(size).toBeGreaterThanOrEqual(min);
+        expect(
+          await widget
+            .locator(`[data-weather-${hook}]`)
+            .evaluate((node) => node.scrollWidth <= node.clientWidth + 1),
+        ).toBe(true);
       }
     }
     expect(
@@ -292,15 +312,65 @@ for (const viewport of [
       ),
     ).toBe(true);
     await page.screenshot({
-      path: `test-results/soft-weather-${viewport.width}.png`,
+      path: `test-results/compact-weather-${viewport.width}-${viewport.motion}.png`,
       animations: "disabled",
       fullPage: viewport.width < 800,
     });
   });
 }
 
+for (const viewport of [
+  { width: 1920, height: 1080 },
+  { width: 1280, height: 720 },
+]) {
+  test(`long weather forecast and 100 percent rain fit the compact footer at ${viewport.width}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const now = new Date("2026-11-20T16:30:00+08:00");
+    await page.clock.install({ time: now });
+    await page.clock.pauseAt(new Date(now.getTime() + 100));
+    const payload = weatherPayload(now);
+    payload.weather = {
+      ...payload.weather!,
+      township: "太麻里鄉",
+      kind: "thunder",
+      description: "多雲午後短暫雷陣雨",
+      rainProbability: 100,
+    };
+    await mockDisplay(page, payload);
+    await page.goto("/display");
+    const widget = page.locator('[data-weather="thunder"]');
+    await expect(widget).toBeVisible();
+    await expect(widget).toHaveAttribute("aria-label", /多雲午後短暫雷陣雨/);
+    await expect(widget.locator("[data-weather-location]")).toHaveText(
+      "太麻里鄉",
+    );
+    await expect(widget.locator("[data-weather-precip]")).toContainText("100%");
+    for (const hook of ["location", "temperature", "description", "precip"]) {
+      expect(
+        await widget
+          .locator(`[data-weather-${hook}]`)
+          .evaluate((node) => node.scrollWidth <= node.clientWidth + 1),
+      ).toBe(true);
+    }
+    const footer = (await page.locator(".announcement-bar").boundingBox())!;
+    expect(footer.height).toBeLessThanOrEqual(
+      viewport.width >= 1900 ? 110 : 86,
+    );
+    const description = (await widget
+      .locator("[data-weather-description]")
+      .boundingBox())!;
+    const precipitation = (await widget
+      .locator("[data-weather-precip]")
+      .boundingBox())!;
+    expect(Math.abs(description.y - precipitation.y)).toBeLessThanOrEqual(2);
+  });
+}
+
 for (const interlude of ["award", "album"] as const) {
-  test(`large weather footer does not cover the ${interlude} interlude`, async ({
+  test(`compact weather footer does not cover the ${interlude} interlude`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 720 });

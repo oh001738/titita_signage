@@ -633,8 +633,14 @@ p {
   gap: 1.8vw;
   background: #f5e9d6;
   border-radius: 16px;
-  padding: 1.5vh 1.6vw;
+  padding: 0.5vh 1.25vw;
   flex-shrink: 0;
+}
+@media (min-width: 801px) {
+  .announcement-bar {
+    height: clamp(76px, 10vh, 110px);
+    min-height: 0;
+  }
 }
 .announcement-label {
   display: flex;
@@ -2025,6 +2031,15 @@ p {
   .announcement-text span {
     white-space: normal;
     overflow-wrap: anywhere;
+  }
+}
+@media (min-width: 801px) and (prefers-reduced-motion: reduce) {
+  .announcement-text span {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    line-height: 1.2;
   }
 }
 
