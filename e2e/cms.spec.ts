@@ -409,3 +409,74 @@ test("award animation and playback choices survive saving and reloading the CMS"
     enabled: true,
   });
 });
+
+test("board preview saves draft edits and switches to the published snapshot without pairing", async ({
+  page,
+  context,
+}) => {
+  const home = await page.request.get("/", { maxRedirects: 0 });
+  expect(home.status()).toBe(307);
+  expect(home.headers().location).toBe("/admin");
+  const env = await readFile(".env.local", "utf8");
+  const password = env
+    .match(
+      /Initial login password; remove this comment after storing it securely: (.+)/,
+    )?.[1]
+    ?.trim();
+  await page.goto("/login");
+  await page.getByLabel("密碼", { exact: true }).fill(password!);
+  await page.getByRole("button", { name: "進入管理後台" }).click();
+  await page.getByRole("button", { name: "公告管理", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "公告內容", exact: true })
+    .first()
+    .fill("這是已發布的看板內容");
+  await page.getByRole("button", { name: "發布到螢幕", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("已發布");
+  await page
+    .getByRole("textbox", { name: "公告內容", exact: true })
+    .first()
+    .fill("這是尚未發布的新草稿");
+  const opened = context.waitForEvent("page");
+  await page.getByRole("button", { name: "看板預覽", exact: true }).click();
+  const preview = await opened;
+  await preview.waitForURL("**/admin/preview");
+  const player = preview.frameLocator('iframe[title="看板播放預覽"]');
+  await expect(
+    player.getByText("這是尚未發布的新草稿", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    preview.getByRole("button", { name: "草稿", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await preview.getByRole("button", { name: "已發布", exact: true }).click();
+  await expect(
+    player.getByText("這是已發布的看板內容", { exact: true }),
+  ).toBeVisible();
+  await preview.screenshot({ path: "test-results/board-preview-published.png", animations: "disabled" });
+  await expect(
+    player.getByText("這是尚未發布的新草稿", { exact: true }),
+  ).toHaveCount(0);
+  await expect(player.getByLabel("螢幕配對碼")).toHaveCount(0);
+  await preview.reload();
+  await expect(
+    preview.getByRole("button", { name: "已發布", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    player.getByText("這是已發布的看板內容", { exact: true }),
+  ).toBeVisible();
+  await preview.getByRole("button", { name: "草稿", exact: true }).click();
+  await expect(
+    player.getByText("這是尚未發布的新草稿", { exact: true }),
+  ).toBeVisible();
+  const saved = (await (await page.request.get("/api/admin/content")).json())
+    .data;
+  expect(saved.draft.announcements[0].body).toBe("這是尚未發布的新草稿");
+  expect(saved.published.content.announcements[0].body).toBe(
+    "這是已發布的看板內容",
+  );
+  await preview.setViewportSize({ width: 390, height: 844 });
+  expect(await preview.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await preview.screenshot({ path: "test-results/board-preview-mobile.png", animations: "disabled" });
+  await expect(page.getByRole("link", { name: "展示畫面" })).toHaveCount(0);
+  await preview.close();
+});

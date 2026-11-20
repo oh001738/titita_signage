@@ -165,6 +165,24 @@ export function Admin() {
     setIsDirty(false);
     return data;
   }
+  function openPreview() {
+    // Open during the click so saving asynchronously does not trigger popup blockers.
+    const preview = window.open("about:blank", "_blank");
+    if (!preview) {
+      setError("瀏覽器已阻擋預覽視窗，請允許此網站開啟新視窗後重試");
+      return;
+    }
+    preview.opener = null;
+    void run(async () => {
+      try {
+        await save();
+        preview.location.replace("/admin/preview");
+      } catch (error) {
+        preview.close();
+        throw error;
+      }
+    });
+  }
   const published = state?.published;
   if (!form || !state)
     return (
@@ -214,9 +232,9 @@ export function Admin() {
               分享給每一個家庭。
             </p>
           </div>
-          <a href="/demo" target="_blank" rel="noreferrer">
-            展示畫面 <ArrowUpRight size={16} />
-          </a>
+          <button disabled={isLoading} onClick={openPreview}>
+            看板預覽 <ArrowUpRight size={16} />
+          </button>
           <button
             onClick={() =>
               void run(async () => {
@@ -395,12 +413,7 @@ export function Admin() {
                     <button
                       className="text-button"
                       disabled={isLoading}
-                      onClick={() =>
-                        void run(async () => {
-                          await save();
-                          window.open("/admin/preview", "_blank", "noopener");
-                        })
-                      }
+                      onClick={openPreview}
                     >
                       開啟完整預覽 <ArrowUpRight size={16} />
                     </button>

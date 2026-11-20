@@ -142,7 +142,13 @@ function AnnouncementText({ body, paused }: { body: string; paused: boolean }) {
     </div>
   );
 }
-export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
+export function Display({
+  mode,
+  previewSource = "draft",
+}: {
+  mode: "demo" | "preview" | "screen";
+  previewSource?: "draft" | "published";
+}) {
   const [payload, setPayload] = useState<DisplayPayload | null>(null);
   const [now, setNow] = useState(new Date());
   const [offset, setOffset] = useState(0);
@@ -203,7 +209,9 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
     async function load() {
       try {
         const response = await fetch(
-          mode === "preview" ? "/api/admin/preview" : "/api/display",
+          mode === "preview"
+            ? `/api/admin/preview?source=${previewSource}`
+            : "/api/display",
           { cache: "no-store" },
         );
         const body = await response.json();
@@ -253,7 +261,7 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
       disposed = true;
       clearInterval(timer);
     };
-  }, [mode]);
+  }, [mode, previewSource]);
   // Use short authenticated requests to estimate server time without including
   // the potentially slow OneCloud schedule request in the clock calculation.
   useEffect(() => {
@@ -652,7 +660,13 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
         <div className="pair-card">
           <Music2 size={42} />
           <p className="eyebrow">TITITA SIGNAGE</p>
-          <h1>{pairRequired ? "請在後台配對這台螢幕" : "正在準備音樂日常"}</h1>
+          <h1>
+            {pairRequired
+              ? "請在後台配對這台螢幕"
+              : mode === "preview" && error
+                ? "目前無法預覽"
+                : "正在準備音樂日常"}
+          </h1>
           {pairRequired && (
             <>
               <p>請在 CMS 後台「螢幕管理」輸入以下配對碼：</p>
@@ -669,8 +683,12 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
               {error}
             </p>
           )}
-          <a href="/login">
-            管理員登入 <ArrowUpRight size={16} />
+          <a
+            href={mode === "preview" ? "/admin" : "/login"}
+            target={mode === "preview" ? "_top" : undefined}
+          >
+            {mode === "preview" ? "返回管理後台" : "管理員登入"}{" "}
+            <ArrowUpRight size={16} />
           </a>
         </div>
       </main>
@@ -796,7 +814,13 @@ export function Display({ mode }: { mode: "demo" | "preview" | "screen" }) {
                 <WifiOff size={13} /> {error || schedule?.error || "課表已過期"}
               </span>
             )}
-            {mode === "preview" && <b>草稿預覽</b>}
+            {mode === "preview" && (
+              <b>
+                {previewSource === "published"
+                  ? `已發布預覽 v${payload.version}`
+                  : "草稿預覽"}
+              </b>
+            )}
           </div>
         </section>
         <aside className="display-aside">
