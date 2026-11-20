@@ -1,5 +1,5 @@
 /* Offline playback only. Never cache CMS pages, sessions, or API JSON. */
-const CACHE = "titita-playback-v7";
+const CACHE = "titita-playback-v8";
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {

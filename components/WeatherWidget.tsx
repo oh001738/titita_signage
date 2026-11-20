@@ -92,32 +92,29 @@ export function WeatherWidget({
         </div>
       </div>
       <div className={styles.readout}>
-        <div className={styles.top}>
+        <div className={styles.copy}>
           <span className={styles.city} data-weather-location>
             {weather.township}
           </span>
-          <strong className={styles.temp}>
-            <span className={styles.value} data-weather-temperature>
-              {ready ? Math.round(weather.temperature!) : "—"}
+          <div className={styles.details}>
+            <span className={styles.condition} data-weather-description>
+              {caption}
             </span>
-            {ready && <span className={styles.unit}>°C</span>}
-          </strong>
+            <span className={styles.precip} data-weather-precip>
+              {ready
+                ? weather.rainProbability !== undefined
+                  ? `3小時降雨 ${weather.rainProbability}%`
+                  : "氣象署預報"
+                : "中央氣象署"}
+            </span>
+          </div>
         </div>
-        <div className={styles.details}>
-          <span className={styles.condition} data-weather-description>
-            {caption}
+        <strong className={styles.temp}>
+          <span className={styles.value} data-weather-temperature>
+            {ready ? Math.round(weather.temperature!) : "—"}
           </span>
-          <span className={styles.divider} aria-hidden="true">
-            ｜
-          </span>
-          <span className={styles.precip} data-weather-precip>
-            {ready
-              ? weather.rainProbability !== undefined
-                ? `3小時降雨 ${weather.rainProbability}%`
-                : "氣象署預報"
-              : "中央氣象署"}
-          </span>
-        </div>
+          {ready && <span className={styles.unit}>°C</span>}
+        </strong>
       </div>
     </div>
   );

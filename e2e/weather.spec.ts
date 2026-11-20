@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Locator } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { defaultContent } from "../lib/defaults";
 import type { DisplayPayload, WeatherKind } from "../types";
@@ -143,6 +143,36 @@ async function mockDisplay(page: Page, payload: DisplayPayload) {
   );
 }
 
+async function expectCenteredTemperature(widget: Locator) {
+  const card = (await widget.boundingBox())!;
+  const temperature = (await widget
+    .locator("[data-weather-temperature]")
+    .boundingBox())!;
+  expect(
+    Math.abs(
+      temperature.y + temperature.height / 2 - (card.y + card.height / 2),
+    ),
+  ).toBeLessThanOrEqual(3);
+  const location = (await widget
+    .locator("[data-weather-location]")
+    .boundingBox())!;
+  const description = (await widget
+    .locator("[data-weather-description]")
+    .boundingBox())!;
+  const precipitation = (await widget
+    .locator("[data-weather-precip]")
+    .boundingBox())!;
+  expect(description.y).toBeGreaterThanOrEqual(
+    location.y + location.height - 1,
+  );
+  expect(precipitation.y).toBeGreaterThanOrEqual(
+    description.y + description.height - 1,
+  );
+  for (const box of [location, description, precipitation]) {
+    expect(box.x + box.width).toBeLessThanOrEqual(temperature.x);
+  }
+}
+
 test("soft weather artwork changes by forecast and night, honors reduced motion, and expires safely", async ({
   page,
 }) => {
@@ -238,6 +268,16 @@ for (const viewport of [
     await page.goto("/display");
     const widget = page.locator('[data-weather="partly"]');
     await expect(widget).toBeVisible();
+    await expectCenteredTemperature(widget);
+    await expect(widget.locator("[data-weather-location]")).toHaveText(
+      "臺東市",
+    );
+    await expect(widget.locator("[data-weather-description]")).toHaveText(
+      "晴時多雲",
+    );
+    await expect(widget.locator("[data-weather-precip]")).toHaveText(
+      "3小時降雨 30%",
+    );
     const rows = page.locator(".lesson-row");
     await expect(rows).toHaveCount(4);
     for (const row of await rows.all()) {
@@ -281,13 +321,6 @@ for (const viewport of [
       expect(noticeBox.height).toBeLessThanOrEqual(
         viewport.width >= 1900 ? 110 : 86,
       );
-      const description = (await widget
-        .locator("[data-weather-description]")
-        .boundingBox())!;
-      const precipitation = (await widget
-        .locator("[data-weather-precip]")
-        .boundingBox())!;
-      expect(Math.abs(description.y - precipitation.y)).toBeLessThanOrEqual(2);
       expect(marqueeBox.x + marqueeBox.width).toBeLessThan(cardBox.x);
       expect(marqueeBox.width).toBeGreaterThan(viewport.width * 0.28);
       const minSizes =
@@ -348,6 +381,7 @@ for (const viewport of [
       "太麻里鄉",
     );
     await expect(widget.locator("[data-weather-precip]")).toContainText("100%");
+    await expectCenteredTemperature(widget);
     for (const hook of ["location", "temperature", "description", "precip"]) {
       expect(
         await widget
@@ -359,13 +393,6 @@ for (const viewport of [
     expect(footer.height).toBeLessThanOrEqual(
       viewport.width >= 1900 ? 110 : 86,
     );
-    const description = (await widget
-      .locator("[data-weather-description]")
-      .boundingBox())!;
-    const precipitation = (await widget
-      .locator("[data-weather-precip]")
-      .boundingBox())!;
-    expect(Math.abs(description.y - precipitation.y)).toBeLessThanOrEqual(2);
   });
 }
 
