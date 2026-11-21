@@ -301,9 +301,11 @@ for (const viewport of [
     }
     const notice = page.locator(".announcement-bar");
     const marquee = page.locator(".announcement-text");
-    await expect(marquee.locator("span")).toHaveText(
+    await expect(marquee).toHaveAttribute(
+      "aria-label",
       payload.content.announcements[0].body,
     );
+    await expect(marquee.locator("span")).not.toBeEmpty();
     if (viewport.width > 800) {
       const tableBox = (await page.locator(".schedule-table").boundingBox())!;
       const noticeBox = (await notice.boundingBox())!;

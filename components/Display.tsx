@@ -1,6 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { WeatherWidget } from "@/components/WeatherWidget";
+import { AnnouncementText } from "@/components/AnnouncementText";
+import {
+  initialAnnouncementPlayback,
+  reconcileAnnouncements,
+  advanceAnnouncement,
+} from "@/lib/announcement-scheduler";
 import {
   Bell,
   Music2,
@@ -106,44 +112,6 @@ function PosterArtwork({ poster }: { poster: Poster }) {
   );
 }
 
-function AnnouncementText({ body, paused }: { body: string; paused: boolean }) {
-  const container = useRef<HTMLDivElement>(null);
-  const text = useRef<HTMLSpanElement>(null);
-  const [widths, setWidths] = useState({ text: 0, container: 0 });
-  useEffect(() => {
-    const measure = () =>
-      setWidths({
-        text: text.current?.scrollWidth ?? 0,
-        container: container.current?.clientWidth ?? 0,
-      });
-    measure();
-    const observer = new ResizeObserver(measure);
-    if (container.current) observer.observe(container.current);
-    if (text.current) observer.observe(text.current);
-    return () => observer.disconnect();
-  }, [body]);
-  const isOverflowing = widths.text > widths.container;
-  const duration = Math.max(8, (widths.text + widths.container) / 45);
-  return (
-    <div className="announcement-text" ref={container}>
-      <span
-        key={body}
-        ref={text}
-        className={isOverflowing ? "announcement-scroll" : ""}
-        style={
-          {
-            "--scroll-start": `${widths.container}px`,
-            "--scroll-end": `-${widths.text}px`,
-            "--scroll-duration": `${duration}s`,
-            animationPlayState: paused ? "paused" : "running",
-          } as React.CSSProperties
-        }
-      >
-        {body}
-      </span>
-    </div>
-  );
-}
 export function Display({
   mode,
   previewSource = "draft",
@@ -173,7 +141,9 @@ export function Display({
     return () => observer.disconnect();
   }, [payload !== null, pairRequired]);
   const [pairCode, setPairCode] = useState("");
-  const [noticeIndex, setNoticeIndex] = useState(0);
+  const [noticePlayback, setNoticePlayback] = useState(
+    initialAnnouncementPlayback,
+  );
   const [posterIndex, setPosterIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -615,16 +585,10 @@ export function Display({
   const notices = (content?.announcements ?? []).filter((a) =>
     isActive(a, now),
   );
-  const urgent = notices.find((a) => a.priority === "urgent");
-  const notice = urgent ?? notices[noticeIndex % Math.max(1, notices.length)];
-  useEffect(() => {
-    if (paused || notices.length < 2) return;
-    const timer = setTimeout(
-      () => setNoticeIndex((i) => i + 1),
-      Math.max(20_000, (notice?.body.length ?? 0) * 1500 + 12_000),
-    );
-    return () => clearTimeout(timer);
-  }, [paused, notices.length, notice?.id, notice?.body]);
+  const playback = reconcileAnnouncements(noticePlayback, notices);
+  if (playback !== noticePlayback) setNoticePlayback(playback);
+  const notice = notices.find((item) => item.id === playback.currentId);
+  const urgent = playback.mode === "urgent";
   useEffect(() => {
     if (mode !== "screen" || !pairRequired) return;
     let cancelled = false;
@@ -911,6 +875,8 @@ export function Display({
       </div>
       <footer
         ref={footerRef}
+        data-notice-id={notice?.id ?? ""}
+        data-notice-generation={playback.generation}
         className={`announcement-bar ${urgent ? "urgent" : ""}`}
       >
         <div className="announcement-label">
@@ -918,8 +884,15 @@ export function Display({
           {notice?.title || "教室公告"}
         </div>
         <AnnouncementText
+          key={`${playback.currentId ?? "fallback"}-${playback.generation}-${notice?.body ?? ""}`}
           body={notice?.body || "歡迎來到音樂的日常。"}
           paused={paused}
+          reducedMotion={reducedMotion}
+          onComplete={() =>
+            setNoticePlayback((current) =>
+              advanceAnnouncement(current, notices),
+            )
+          }
         />
         <WeatherWidget weather={payload?.weather} />
       </footer>

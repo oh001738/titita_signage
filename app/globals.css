@@ -1999,12 +1999,24 @@ p {
   }
 }
 .announcement-text {
+  position: relative;
   flex: 1;
   min-width: 0;
   overflow: hidden;
   font-size: clamp(16px, 1.8vw, 36px);
   font-weight: 600;
   line-height: 1.5;
+}
+.announcement-text .announcement-measure {
+  position: absolute;
+  visibility: hidden;
+  width: max-content;
+  white-space: pre;
+  pointer-events: none;
+  font-weight: inherit;
+}
+.announcement-text .announcement-measure::before {
+  content: attr(data-measure-text);
 }
 .announcement-text span {
   display: inline-block;

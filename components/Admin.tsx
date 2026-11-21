@@ -645,6 +645,11 @@ export function Admin() {
                       )
                     }
                   />
+                  {item.priority === "urgent" && !item.endsAt && (
+                    <p className="field-hint">
+                      緊急公告會優先顯示，建議設定下架時間，避免一般公告長期無法播放。
+                    </p>
+                  )}
                 </article>
               ))}
               {!form.announcements.length && (
