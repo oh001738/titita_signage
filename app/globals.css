@@ -270,6 +270,19 @@ p {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.04em;
 }
+.clock-colon {
+  animation: clock-colon-blink 2s ease-in-out infinite;
+}
+@keyframes clock-colon-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .clock-colon {
+    animation: none;
+  }
+}
 .display-main {
   display: grid;
   grid-template-columns: minmax(0, 1.52fr) minmax(0, 1fr);

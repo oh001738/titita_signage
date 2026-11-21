@@ -710,7 +710,13 @@ export function Display({
             weekday: "long",
           }).format(now)}
         </div>
-        <time className="display-clock">{taiwanTime(now)}</time>
+        <time className="display-clock" aria-label={taiwanTime(now)}>
+          {taiwanTime(now).slice(0, 2)}
+          <span className="clock-colon" aria-hidden="true">
+            :
+          </span>
+          {taiwanTime(now).slice(3)}
+        </time>
       </header>
       <div className="display-main">
         <section className="schedule-panel">
