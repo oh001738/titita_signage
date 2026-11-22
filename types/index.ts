@@ -11,6 +11,8 @@ export interface Poster {
   title: string;
   subtitle: string;
   image: string;
+  showCaption?: boolean;
+  fit?: "contain" | "cover";
   duration: number;
   startsAt: string;
   endsAt: string;

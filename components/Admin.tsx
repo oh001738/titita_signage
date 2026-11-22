@@ -676,6 +676,8 @@ export function Admin() {
                         title: "新的音樂活動",
                         subtitle: "",
                         image: "/concert-art.png",
+                        showCaption: false,
+                        fit: "contain",
                         duration: 15,
                         startsAt: "",
                         endsAt: "",
@@ -764,7 +766,7 @@ export function Admin() {
                       </div>
                     </div>
                     <label>
-                      活動標題
+                      活動標題（選填）
                       <input
                         maxLength={50}
                         value={item.title}
@@ -782,7 +784,7 @@ export function Admin() {
                     </label>
                     <div className="form-grid">
                       <label>
-                        副標題
+                        副標題（選填）
                         <input
                           maxLength={80}
                           value={item.subtitle}
@@ -818,6 +820,51 @@ export function Admin() {
                         />
                       </label>
                     </div>
+                    <div className="form-grid">
+                      <label>
+                        圖片顯示方式
+                        <select
+                          value={item.fit ?? "contain"}
+                          onChange={(e) =>
+                            update(
+                              "posters",
+                              form.posters.map((p) =>
+                                p.id === item.id
+                                  ? {
+                                      ...p,
+                                      fit: e.target.value as
+                                        "contain" | "cover",
+                                    }
+                                  : p,
+                              ),
+                            )
+                          }
+                        >
+                          <option value="contain">完整顯示</option>
+                          <option value="cover">填滿畫面（可能裁切）</option>
+                        </select>
+                      </label>
+                      <label className="poster-caption-toggle">
+                        <input
+                          type="checkbox"
+                          checked={item.showCaption ?? false}
+                          onChange={(e) =>
+                            update(
+                              "posters",
+                              form.posters.map((p) =>
+                                p.id === item.id
+                                  ? { ...p, showCaption: e.target.checked }
+                                  : p,
+                              ),
+                            )
+                          }
+                        />{" "}
+                        在圖片下方顯示標題與副標題
+                      </label>
+                    </div>
+                    <p className="field-hint">
+                      預設只顯示完整圖片；需要額外文字時，可開啟圖片下方標題。
+                    </p>
                     <WindowFields
                       value={item}
                       onChange={(key, value) =>

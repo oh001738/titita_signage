@@ -125,9 +125,11 @@ export const contentSchema = z
         z
           .object({
             id: text(80).min(1),
-            title: text(50).min(1),
+            title: text(50),
             subtitle: text(80),
             image: localImage,
+            showCaption: z.boolean().optional(),
+            fit: z.enum(["contain", "cover"]).optional(),
             duration: z.number().int().min(8).max(120),
             ...windowFields,
           })

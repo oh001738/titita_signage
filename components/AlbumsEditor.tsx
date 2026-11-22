@@ -132,14 +132,6 @@ export function AlbumsEditor({
     <section className="editor-section album-editor">
       <div className="section-toolbar">
         <span>活動相簿 · {albums.length} 本</span>
-        <a
-          href="/admin/preview"
-          target="_blank"
-          rel="noreferrer"
-          className="album-preview-link"
-        >
-          預覽已儲存草稿 ↗
-        </a>
         <button
           className="secondary"
           disabled={disabled || albums.length >= 30}
@@ -150,7 +142,7 @@ export function AlbumsEditor({
       </div>
       <p>
         圖片在上傳後儲存在
-        NAS；請先儲存草稿再開啟預覽，發布後才會更新螢幕。尚未儲存的新增照片刪除後不會進入回收站。請先確認照片公開播放的同意。
+        NAS；使用左側「看板預覽」會先儲存草稿，發布後才會更新螢幕。尚未儲存的新增照片刪除後不會進入回收站。請先確認照片公開播放的同意。
       </p>
       {error && (
         <p className="error" role="alert">

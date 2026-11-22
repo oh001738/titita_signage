@@ -64,7 +64,12 @@ function PosterArtwork({ poster }: { poster: Poster }) {
   const [previous, setPrevious] = useState<Poster | null>(null);
   useEffect(() => {
     if (poster.id === shown.id && poster.image === shown.image) {
-      if (poster.title !== shown.title || poster.subtitle !== shown.subtitle)
+      if (
+        poster.title !== shown.title ||
+        poster.subtitle !== shown.subtitle ||
+        poster.showCaption !== shown.showCaption ||
+        poster.fit !== shown.fit
+      )
         setShown(poster);
       return;
     }
@@ -85,7 +90,15 @@ function PosterArtwork({ poster }: { poster: Poster }) {
       image.onload = null;
       image.onerror = null;
     };
-  }, [poster.id, poster.image, poster.title, poster.subtitle, shown]);
+  }, [
+    poster.id,
+    poster.image,
+    poster.title,
+    poster.subtitle,
+    poster.showCaption,
+    poster.fit,
+    shown,
+  ]);
   useEffect(() => {
     if (!previous) return;
     const timer = setTimeout(() => setPrevious(null), 500);
@@ -96,12 +109,20 @@ function PosterArtwork({ poster }: { poster: Poster }) {
       className={`poster-layer ${entering ? "poster-layer-enter" : ""}`}
       key={`${item.id}:${item.image}`}
     >
-      <img className="poster-image" src={item.image} alt="音樂活動插畫" />
-      <div className="poster-title">
-        <span className="eyebrow">MUSIC BRINGS US TOGETHER</span>
-        <h2>{item.title}</h2>
-        <p>{item.subtitle}</p>
+      <div className="poster-artwork">
+        <img
+          className="poster-image"
+          src={item.image}
+          alt={item.title || "活動海報"}
+          style={{ objectFit: item.fit ?? "contain" }}
+        />
       </div>
+      {item.showCaption && (item.title || item.subtitle) && (
+        <div className="poster-title">
+          {item.title && <h2>{item.title}</h2>}
+          {item.subtitle && <p>{item.subtitle}</p>}
+        </div>
+      )}
     </div>
   );
   return (
