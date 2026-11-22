@@ -99,9 +99,14 @@ export function WeatherWidget({
         key={ready && secondary ? page : 0}
       >
         <div className={styles.copy}>
-          <span className={styles.city} data-weather-location>
-            {weather.township}
-          </span>
+          <div className={styles.cityRow}>
+            <span className={styles.city} data-weather-location>
+              {weather.township}
+            </span>
+            {ready && page === 1 && secondary && (
+              <small className={styles.tempLabel}>體感</small>
+            )}
+          </div>
           <div className={styles.details}>
             {!ready && (
               <span className={styles.condition} data-weather-description>
@@ -120,9 +125,6 @@ export function WeatherWidget({
           </div>
         </div>
         <strong className={styles.temp}>
-          {ready && page === 1 && secondary && (
-            <small className={styles.tempLabel}>體感</small>
-          )}
           <span className={styles.value} data-weather-temperature>
             {ready
               ? Math.round(
