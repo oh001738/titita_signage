@@ -1,7 +1,7 @@
-/* Soft sage distinguishes the card while matching the signage palette. */
+/* Warm white makes the colorful weather artwork stand out. */
 .widget {
-  --sw-bg1: #e0eee2;
-  --sw-bg2: #c3dbca;
+  --sw-bg1: #fffefa;
+  --sw-bg2: #f7faf6;
   --sw-float: 6s;
   isolation: isolate;
   position: relative;
@@ -140,10 +140,10 @@
   border-radius: 50%;
   background: radial-gradient(
     circle at 30% 25%,
-    #fff59b 0%,
-    #ffe970 27%,
-    #f6cb36 72%,
-    #eab02b 100%
+    #ffe36a 0%,
+    #facd35 27%,
+    #e9a919 72%,
+    #d68b0c 100%
   );
   box-shadow:
     inset -4px -5px 8px #d89a2833,
@@ -162,7 +162,7 @@
   width: 9%;
   height: 17%;
   border-radius: 99px;
-  background: linear-gradient(90deg, #ffec75, #f5cd36);
+  background: linear-gradient(90deg, #f6c538, #d99412);
   transform-origin: 50% 294%;
   box-shadow: inset 1px 0 2px #fff8b36b;
 }
@@ -278,7 +278,7 @@
   width: 6%;
   height: 33%;
   border-radius: 80% 5% 80% 80%;
-  background: linear-gradient(145deg, #c2edff, #61c7ed);
+  background: linear-gradient(145deg, #59b4df, #2185b8);
   transform: rotate(-25deg);
   animation: sw-fall 1.6s linear infinite;
 }
@@ -294,7 +294,7 @@
   height: 40%;
   left: 47%;
   top: 61%;
-  background: linear-gradient(120deg, #fff2a1, #fbd648);
+  background: linear-gradient(120deg, #f6cd3e, #d99412);
   clip-path: polygon(42% 0, 100% 0, 62% 40%, 94% 40%, 10% 100%, 37% 52%, 0 52%);
   filter: drop-shadow(0 3px 5px #f5c24f55);
   animation: sw-flash 5s ease-in-out infinite;
@@ -310,7 +310,7 @@
 .mist i {
   height: 6px;
   border-radius: 20px;
-  background: linear-gradient(90deg, #cde5f722, #e9f7ffcc, #cde5f722);
+  background: linear-gradient(90deg, #6f9eaa44, #6697a6, #6f9eaa44);
   animation: sw-drift 6s ease-in-out infinite;
 }
 .mist i:nth-child(2) {
@@ -333,7 +333,7 @@
   height: 10px;
   width: 90%;
   border-radius: 99px;
-  background: linear-gradient(90deg, #b9e6f14d, #d3f5fd);
+  background: linear-gradient(90deg, #71aebc80, #4a9bb0);
   animation: sw-drift 3s ease-in-out infinite;
   box-shadow: 0 3px 5px #43599920;
 }
@@ -353,7 +353,7 @@
   top: 72%;
   display: flex;
   justify-content: space-between;
-  color: #e7f8ff;
+  color: #398ab6;
   font-size: 26px;
 }
 .snow i {
@@ -402,9 +402,9 @@
   display: grid;
 }
 [data-icon="sun"] .sun {
-  left: 24%;
+  left: 18%;
   top: 6%;
-  width: 57%;
+  width: 70%;
 }
 [data-icon="night"] .moon {
   left: 31%;
@@ -425,11 +425,6 @@
 }
 [data-icon="loading"] .cloud {
   animation: sw-twinkle 3s ease-in-out infinite;
-}
-.widget[data-icon="night"],
-.widget[data-icon="night-cloud"] {
-  --sw-bg1: #e0eee2;
-  --sw-bg2: #c3dbca;
 }
 .widget[data-icon="night"] .moon,
 .widget[data-icon="night-cloud"] .moon {
