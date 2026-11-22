@@ -82,7 +82,9 @@ export function WeatherSettings() {
     <section className="admin-card editor-card">
       <h2>中央氣象署天氣設定</h2>
       <p className="field-hint">
-        選擇教室所在地，儲存後看板右下角會在 30 秒內同步天氣與動畫。
+        選擇教室所在地，儲存後看板右下角會在 30
+        秒內同步天氣與動畫。顯示資料為鄉鎮預報；時段交接時可能顯示未來 3
+        小時內最近的預報。
       </p>
       {error && (
         <p className="error feedback" role="alert">

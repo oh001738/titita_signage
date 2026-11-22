@@ -743,7 +743,6 @@ export function Display({
         <section className="schedule-panel">
           <div className="schedule-heading">
             <div>
-              <p className="eyebrow">TODAY AT TITITA</p>
               <h1>
                 今日課程<span className="music-note">♪</span>
               </h1>
@@ -877,7 +876,6 @@ export function Display({
           </div>
           <div className="line-card">
             <div>
-              <p className="eyebrow">STAY IN TUNE</p>
               <h2>
                 把音樂日常
                 <br />

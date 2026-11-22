@@ -4,6 +4,46 @@ import { defaultContent } from "../lib/defaults";
 import type { DisplayPayload, WeatherKind } from "../types";
 
 test.use({ serviceWorkers: "block" });
+test("weather rotates to valid comfort details and skips missing details", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  const now = new Date("2026-11-20T16:30:00+08:00");
+  await page.clock.install({ time: now });
+  const payload = weatherPayload(now);
+  payload.weather = {
+    ...payload.weather!,
+    apparentTemperature: 27,
+    relativeHumidity: 70,
+    comfortDescription: "舒適至悶熱",
+  };
+  await mockDisplay(page, payload);
+  await page.goto("/display");
+  await expect(page.locator('[data-weather-page="1"]')).toBeVisible();
+  await page.clock.runFor(10000);
+  const second = page.locator('[data-weather-page="2"]');
+  await expect(second).toBeVisible();
+  await expect(second).toContainText("體感");
+  await expect(second).toContainText("27");
+  await expect(second).toContainText("濕度 70% · 舒適至悶熱");
+  const detail = second.locator("[data-weather-precip]");
+  expect(
+    await detail.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+  ).toBe(true);
+  const label = await second.getByText("體感", { exact: true }).boundingBox();
+  const card = await page.locator('[data-weather="partly"]').boundingBox();
+  expect(label!.y).toBeGreaterThanOrEqual(card!.y);
+  await page.screenshot({
+    path: "test-results/weather-second-page.png",
+    animations: "disabled",
+  });
+  await page.clock.runFor(10000);
+  await expect(page.locator('[data-weather-page="1"]')).toBeVisible();
+  payload.weather = { ...payload.weather!, comfortDescription: undefined };
+  await page.reload();
+  await page.clock.runFor(11000);
+  await expect(page.locator('[data-weather-page="2"]')).toHaveCount(0);
+});
 test("weather settings load locations, test without saving, and retain edits across navigation", async ({
   page,
   request,

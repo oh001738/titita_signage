@@ -47,6 +47,15 @@
   border-left: 1px solid #805e4050;
   margin: 1px 0;
   padding: 0 clamp(10px, 0.8vw, 16px);
+  animation: weather-page-fade 0.6s ease both;
+}
+@keyframes weather-page-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .copy {
   display: flex;
@@ -67,6 +76,19 @@
   align-items: baseline;
   flex-shrink: 0;
   gap: 2px;
+  position: relative;
+}
+.tempLabel {
+  position: absolute;
+  top: -0.85em;
+  right: 0;
+  font-size: clamp(12px, 0.8vw, 16px);
+  line-height: 1;
+}
+.readout[data-weather-page="2"] .precip {
+  font-size: clamp(13px, 0.9vw, 19px);
+  max-width: 100%;
+  flex-shrink: 1;
 }
 .value {
   font-size: clamp(40px, 3.125vw, 64px);
@@ -473,6 +495,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .readout {
+    animation: none;
+  }
   .scene,
   .scene * {
     animation: none !important;

@@ -24,43 +24,64 @@ export function weatherKind(text: string, wind: number): WeatherKind {
 export function selectWeather(
   location: ForecastLocation,
   now = Date.now(),
+  allowFuture = false,
 ): DisplayWeather {
   const unavailable: DisplayWeather = {
     township: location.LocationName,
     status: "unavailable",
   };
-  const find = (name: string) =>
+  const startOf = (
+    time: ForecastLocation["WeatherElement"][number]["Time"][number],
+  ) => Date.parse(time.StartTime ?? time.DataTime ?? "");
+  const endOf = (
+    time: ForecastLocation["WeatherElement"][number]["Time"][number],
+  ) => (time.EndTime ? Date.parse(time.EndTime) : startOf(time) + 3 * 3600000);
+  const find = (name: string, at: number) =>
     location.WeatherElement.find((e) => e.ElementName === name)
-      ?.Time.filter((time) => {
-        const start = Date.parse(time.StartTime ?? time.DataTime ?? "");
-        const end = time.EndTime
-          ? Date.parse(time.EndTime)
-          : start + 3 * 3600000;
-        return start <= now && now < end;
-      })
-      .sort(
-        (a, b) =>
-          Date.parse(b.StartTime ?? b.DataTime ?? "") -
-          Date.parse(a.StartTime ?? a.DataTime ?? ""),
-      )[0];
-  const temp = find("溫度"),
-    wx = find("天氣現象"),
-    rain = find("3小時降雨機率"),
-    wind = find("風速");
+      ?.Time.filter((t) => startOf(t) <= at && at < endOf(t))
+      .sort((a, b) => startOf(b) - startOf(a))[0];
+  let at = now;
+  if (allowFuture && (!find("溫度", at) || !find("天氣現象", at))) {
+    const candidates =
+      location.WeatherElement.find((e) => e.ElementName === "天氣現象")
+        ?.Time.map(startOf)
+        .filter((t) => t > now && t <= now + 3 * 3600000)
+        .sort((a, b) => a - b) ?? [];
+    const next = candidates.find((t) => find("溫度", t) && find("天氣現象", t));
+    if (next !== undefined) at = next;
+  }
+  const temp = find("溫度", at),
+    wx = find("天氣現象", at),
+    rain = find("3小時降雨機率", at),
+    wind = find("風速", at);
+  const apparent = find("體感溫度", at),
+    humidity = find("相對濕度", at),
+    comfort = find("舒適度指數", at);
   const number = (v?: string) =>
     v?.trim() && Number.isFinite(Number(v)) ? Number(v) : undefined;
   const temperature = number(temp?.ElementValue[0]?.Temperature);
   const description = wx?.ElementValue[0]?.Weather;
   if (temperature === undefined || !description || !temp || !wx)
     return unavailable;
-  const ends = [temp, wx, rain]
-    .filter(Boolean)
-    .map((t) =>
-      t!.EndTime
-        ? Date.parse(t!.EndTime!)
-        : Date.parse(t!.DataTime!) + 3 * 3600000,
-    );
   const probability = number(rain?.ElementValue[0]?.ProbabilityOfPrecipitation);
+  const relativeHumidity = number(humidity?.ElementValue[0]?.RelativeHumidity);
+  const apparentTemperature = number(
+    apparent?.ElementValue[0]?.ApparentTemperature,
+  );
+  const comfortDescription =
+    comfort?.ElementValue[0]?.ComfortIndexDescription?.trim();
+  const hasSecondary =
+    apparentTemperature !== undefined &&
+    relativeHumidity !== undefined &&
+    relativeHumidity >= 0 &&
+    relativeHumidity <= 100 &&
+    !!comfortDescription;
+  const used = [
+    temp,
+    wx,
+    rain,
+    ...(hasSecondary ? [apparent, humidity, comfort] : []),
+  ].filter((v): v is NonNullable<typeof v> => !!v);
   return {
     township: location.LocationName,
     status: "ready",
@@ -74,6 +95,10 @@ export function selectWeather(
       probability !== undefined && probability >= 0 && probability <= 100
         ? probability
         : undefined,
-    validUntil: new Date(Math.min(...ends)).toISOString(),
+    ...(hasSecondary
+      ? { apparentTemperature, relativeHumidity, comfortDescription }
+      : {}),
+    forecastStart: new Date(at).toISOString(),
+    validUntil: new Date(Math.min(...used.map(endOf))).toISOString(),
   };
 }

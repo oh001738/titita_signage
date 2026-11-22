@@ -141,43 +141,67 @@ export async function fetchCountyForecast(county: string, apiKey: string) {
     throw new HttpError(502, "無法取得氣象署資料，請檢查授權碼或稍後重試");
   }
 }
+type WeatherCacheEntry = {
+  until: number;
+  data: Promise<ForecastLocation[]>;
+  previous?: ForecastLocation[];
+  latest?: ForecastLocation[];
+};
 const cache = globalThis as typeof globalThis & {
-  signageWeather?: Map<
-    string,
-    { until: number; data: Promise<ForecastLocation[]> }
-  >;
+  signageWeather?: Map<string, WeatherCacheEntry>;
 };
 export async function displayWeather(
   state: CmsState,
 ): Promise<DisplayWeather | null> {
   if (!state.weather?.encryptedKey) return null;
   const { county, township, encryptedKey } = state.weather;
-  try {
-    const id = `${county}:${hashToken(encryptedKey)}`;
-    const entries: NonNullable<typeof cache.signageWeather> =
-      (cache.signageWeather ??= new Map());
-    let entry = entries.get(id);
-    if (!entry || entry.until <= Date.now()) {
-      entries.clear();
-      entry = {
-        until: Date.now() + 15 * 60000,
-        data: resolveWeatherKey(state).then((key) =>
-          fetchCountyForecast(county, key),
-        ),
-      };
-      entries.set(id, entry);
-      const current = entry;
-      void entry.data.catch(() => {
+  const id = `${county}:${hashToken(encryptedKey)}`;
+  const entries: NonNullable<typeof cache.signageWeather> =
+    (cache.signageWeather ??= new Map());
+  let entry = entries.get(id);
+  if (!entry || entry.until <= Date.now()) {
+    const previous = entry?.latest ?? entry?.previous;
+    entries.clear();
+    entry = {
+      until: Date.now() + 15 * 60000,
+      previous,
+      data: Promise.resolve([]),
+    };
+    const current = entry;
+    entry.data = resolveWeatherKey(state)
+      .then((key) => fetchCountyForecast(county, key))
+      .then((data) => {
+        current.latest = data;
+        return data;
+      })
+      .catch(() => {
         current.until = Date.now() + 60000;
+        console.warn("[weather] forecast fetch failed; retrying in one minute");
+        return [];
       });
-    }
-    const location = (await entry.data).find(
-      (item) => item.LocationName === township,
-    );
-    return location
-      ? selectWeather(location)
-      : { township, status: "unavailable" };
-  } catch {
-    return { township, status: "unavailable" };
+    entries.set(id, entry);
   }
+  const previous = entry.previous;
+  const data = await entry.data;
+  const latest = data.find((item) => item.LocationName === township);
+  const old = previous?.find((item) => item.LocationName === township);
+  const latestCurrent = latest && selectWeather(latest);
+  if (latestCurrent?.status === "ready") return latestCurrent;
+  const oldCurrent = old && selectWeather(old);
+  if (oldCurrent?.status === "ready") return oldCurrent;
+  const future =
+    (latest && selectWeather(latest, Date.now(), true)) ||
+    (old && selectWeather(old, Date.now(), true));
+  const next =
+    future?.status === "ready"
+      ? future
+      : old && selectWeather(old, Date.now(), true);
+  if (next?.status === "ready") {
+    console.info(
+      "[weather] no current forecast; using next forecast within three hours",
+    );
+    return next;
+  }
+  console.warn("[weather] no current or upcoming forecast available");
+  return { township, status: "unavailable" };
 }

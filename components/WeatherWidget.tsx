@@ -12,6 +12,19 @@ export function WeatherWidget({
     const timer = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(timer);
   }, []);
+  const [page, setPage] = useState(0);
+  const secondary =
+    weather?.apparentTemperature !== undefined &&
+    weather?.relativeHumidity !== undefined &&
+    !!weather?.comfortDescription;
+  useEffect(() => {
+    if (!secondary || weather?.status !== "ready") {
+      setPage(0);
+      return;
+    }
+    const timer = setInterval(() => setPage((value) => 1 - value), 10000);
+    return () => clearInterval(timer);
+  }, [secondary, weather?.status, weather?.township]);
   if (!weather) return null;
   const ready =
     weather.status === "ready" && Date.parse(weather.validUntil ?? "") > now;
@@ -32,9 +45,11 @@ export function WeatherWidget({
       data-weather-night={night}
       data-icon={icon}
       aria-label={
-        ready
-          ? `${weather.township}，${weather.description}，預報溫度 ${weather.temperature} 度${weather.rainProbability !== undefined ? `，3小時降雨機率 ${weather.rainProbability}%` : ""}`
-          : `${weather.township}，天氣更新中`
+        ready && secondary && page === 1
+          ? `${weather.township}，預報體感溫度 ${weather.apparentTemperature} 度，相對濕度 ${weather.relativeHumidity}%，${weather.comfortDescription}`
+          : ready
+            ? `${weather.township}，${weather.description}，預報溫度 ${weather.temperature} 度${weather.rainProbability !== undefined ? `，3小時降雨機率 ${weather.rainProbability}%` : ""}`
+            : `${weather.township}，天氣更新中`
       }
     >
       <div className={styles.visual}>
@@ -78,7 +93,11 @@ export function WeatherWidget({
           </div>
         </div>
       </div>
-      <div className={styles.readout}>
+      <div
+        className={styles.readout}
+        data-weather-page={ready && secondary ? page + 1 : 1}
+        key={ready && secondary ? page : 0}
+      >
         <div className={styles.copy}>
           <span className={styles.city} data-weather-location>
             {weather.township}
@@ -91,16 +110,27 @@ export function WeatherWidget({
             )}
             <span className={styles.precip} data-weather-precip>
               {ready
-                ? weather.rainProbability !== undefined
-                  ? `3小時降雨 ${weather.rainProbability}%`
-                  : "氣象署預報"
+                ? page === 1 && secondary
+                  ? `濕度 ${weather.relativeHumidity}% · ${weather.comfortDescription}`
+                  : weather.rainProbability !== undefined
+                    ? `3小時降雨 ${weather.rainProbability}%`
+                    : "氣象署預報"
                 : "中央氣象署"}
             </span>
           </div>
         </div>
         <strong className={styles.temp}>
+          {ready && page === 1 && secondary && (
+            <small className={styles.tempLabel}>體感</small>
+          )}
           <span className={styles.value} data-weather-temperature>
-            {ready ? Math.round(weather.temperature!) : "—"}
+            {ready
+              ? Math.round(
+                  page === 1 && secondary
+                    ? weather.apparentTemperature!
+                    : weather.temperature!,
+                )
+              : "—"}
           </span>
           {ready && <span className={styles.unit}>°C</span>}
         </strong>

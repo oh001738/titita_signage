@@ -165,6 +165,10 @@ export interface DisplayWeather {
   description?: string;
   temperature?: number;
   rainProbability?: number;
+  apparentTemperature?: number;
+  relativeHumidity?: number;
+  comfortDescription?: string;
+  forecastStart?: string;
   validUntil?: string;
 }
 export interface ApiResponse<T> {

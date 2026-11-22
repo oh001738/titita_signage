@@ -74,3 +74,52 @@ it("maps forecast wording to animations with dangerous weather taking precedence
   expect(weatherKind("晴", 12)).toBe("wind");
   expect(weatherKind("雷雨", 12)).toBe("thunder");
 });
+it("uses a coherent upcoming forecast only within three hours", () => {
+  const data = fixture();
+  const before = Date.parse(start) - 30 * 60000;
+  expect(selectWeather(data, before).status).toBe("unavailable");
+  expect(selectWeather(data, before, true)).toMatchObject({
+    status: "ready",
+    temperature: 23,
+    rainProbability: 30,
+    forecastStart: new Date(start).toISOString(),
+  });
+  expect(
+    selectWeather(data, Date.parse(start) - 3 * 3600000 - 1, true).status,
+  ).toBe("unavailable");
+});
+it("only provides the second page when all fields are valid for the chosen period", () => {
+  const data = fixture();
+  data.WeatherElement.push(
+    {
+      ElementName: "體感溫度",
+      Time: [
+        { DataTime: start, ElementValue: [{ ApparentTemperature: "27" }] },
+      ],
+    },
+    {
+      ElementName: "相對濕度",
+      Time: [{ DataTime: start, ElementValue: [{ RelativeHumidity: "70" }] }],
+    },
+    {
+      ElementName: "舒適度指數",
+      Time: [
+        {
+          DataTime: start,
+          ElementValue: [
+            { ComfortIndex: "21", ComfortIndexDescription: "舒適" },
+          ],
+        },
+      ],
+    },
+  );
+  expect(selectWeather(data, Date.parse(start))).toMatchObject({
+    apparentTemperature: 27,
+    relativeHumidity: 70,
+    comfortDescription: "舒適",
+  });
+  data.WeatherElement[4].Time[0].ElementValue[0].RelativeHumidity = "-";
+  expect(
+    selectWeather(data, Date.parse(start)).apparentTemperature,
+  ).toBeUndefined();
+});

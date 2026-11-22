@@ -8,6 +8,7 @@ import {
   resolveWeatherKey,
   publicWeatherSettings,
   fetchCountyForecast,
+  displayWeather,
 } from "@/lib/weather";
 import { readState } from "@/lib/store";
 import { GET, PUT, POST } from "@/app/api/admin/weather/route";
@@ -43,10 +44,73 @@ beforeEach(async () => {
   );
 });
 afterEach(async () => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   vi.clearAllMocks();
   await rm(dir, { recursive: true, force: true });
+});
+it("keeps the previous valid forecast across refreshes and switches to the next period without using expired values", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-11-22T11:00:00+08:00"));
+  const state = defaultState();
+  state.weather = {
+    revision: 1,
+    county: "臺東縣",
+    township: "臺東市",
+    encryptedKey: await encryptWeatherKey(key),
+  };
+  const weather = (start: string, end: string, temp: string) => ({
+    success: "true",
+    records: {
+      Locations: [
+        {
+          LocationsName: "臺東縣",
+          Location: [
+            {
+              LocationName: "臺東市",
+              WeatherElement: [
+                {
+                  ElementName: "溫度",
+                  Time: [
+                    { DataTime: start, ElementValue: [{ Temperature: temp }] },
+                  ],
+                },
+                {
+                  ElementName: "天氣現象",
+                  Time: [
+                    {
+                      StartTime: start,
+                      EndTime: end,
+                      ElementValue: [{ Weather: "晴" }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  });
+  const old = weather(
+    "2026-11-22T10:00:00+08:00",
+    "2026-11-22T12:00:00+08:00",
+    "22",
+  );
+  const upcoming = weather(
+    "2026-11-22T12:00:00+08:00",
+    "2026-11-22T15:00:00+08:00",
+    "25",
+  );
+  vi.mocked(fetch).mockImplementation(async () => Response.json(old));
+  expect((await displayWeather(state))?.temperature).toBe(22);
+  vi.setSystemTime(new Date("2026-11-22T11:20:00+08:00"));
+  vi.mocked(fetch).mockImplementation(async () => Response.json(upcoming));
+  expect((await displayWeather(state))?.temperature).toBe(22);
+  expect((await displayWeather(state))?.temperature).toBe(22);
+  vi.setSystemTime(new Date("2026-11-22T12:00:00+08:00"));
+  expect((await displayWeather(state))?.temperature).toBe(25);
 });
 const request = (method: string, body: unknown) =>
   new Request("http://localhost/api/admin/weather", {
