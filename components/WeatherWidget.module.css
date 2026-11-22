@@ -1,7 +1,7 @@
-/* Rounded weather illustrations and lavender card approved in the design preview. */
+/* Warm apricot card complements the cream and forest-green signage. */
 .widget {
-  --sw-bg1: #929ed9;
-  --sw-bg2: #6c83bf;
+  --sw-bg1: #faead5;
+  --sw-bg2: #ebc9a5;
   --sw-float: 6s;
   isolation: isolate;
   position: relative;
@@ -11,12 +11,12 @@
   width: clamp(300px, 20.8vw, 440px);
   min-height: clamp(64px, 8.3vh, 90px);
   border-radius: 14px;
-  color: #fff;
+  color: #173f3b;
   background: linear-gradient(128deg, var(--sw-bg1), var(--sw-bg2));
   box-shadow:
     inset 0 1px 1px #ffffff60,
-    inset 0 0 0 1px #ffffff22,
-    0 4px 12px #3a50951c;
+    inset 0 0 0 1px #a77c5133,
+    0 4px 12px #8358331c;
   overflow: hidden;
 }
 .widget::before {
@@ -24,7 +24,7 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: radial-gradient(ellipse at 5% 0%, #d3d4ff22, transparent 65%);
+  background: radial-gradient(ellipse at 5% 0%, #fff9ee66, transparent 65%);
   pointer-events: none;
 }
 .visual {
@@ -44,7 +44,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 8px;
-  border-left: 1px solid #ffffff62;
+  border-left: 1px solid #805e4050;
   margin: 1px 0;
   padding: 0 clamp(10px, 0.8vw, 16px);
 }
@@ -401,8 +401,16 @@
 }
 .widget[data-icon="night"],
 .widget[data-icon="night-cloud"] {
-  --sw-bg1: #6878b3;
-  --sw-bg2: #44588e;
+  --sw-bg1: #faead5;
+  --sw-bg2: #ebc9a5;
+}
+.widget[data-icon="night"] .moon,
+.widget[data-icon="night-cloud"] .moon {
+  background: radial-gradient(circle at 20% 30%, #f8e9a4, #d9a947);
+}
+.widget[data-icon="night"] .stars i,
+.widget[data-icon="night-cloud"] .stars i {
+  background: #b17828;
 }
 
 @keyframes sw-hover {
